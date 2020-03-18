@@ -25,6 +25,8 @@ FROM dwh_il.dim_date
     AND first_day_of_month > DATEADD('MONTH',-25, DATE_TRUNC('MONTH', CURRENT_DATE)) --> between current_date - 90 - 7 and current_date
 )
 
+select getdate() script_started;
+
 drop table if exists fct_orders;
 create temp table fct_orders as (
     select
@@ -65,6 +67,8 @@ create temp table fct_orders as (
         where not (o.is_cancelled or o.is_declined or o.is_failed) and o.source_id > 0 and o.order_date between current_date - 90 - 7 and current_date) o
     left join (select dwh_company_id,dwh_country_id,source_id from dwh_il.dim_countries) co on o.source_id = co.source_id
     left join (select nps,order_id,source_id from dwh_il.fct_nps_ao) nps on o.order_id = nps.order_id and o.source_id = nps.source_id);
+
+select getdate() fct_orders_completed;
 
 drop table if exists log_orders;
 create temp table log_orders as (
@@ -144,6 +148,8 @@ create temp table log_orders as (
     left join (select vendor_name, vendor_code,vendor_id,rdbms_id, city_id from dwh_redshift_logistic.v_clg_vendors) v using(rdbms_id, city_id, vendor_id)
     where lo.order_status = 'completed');
 
+select getdate() log_orders_completed;
+
 drop table if exists od_orders;
 create temp table od_orders as (
     select
@@ -175,6 +181,8 @@ create temp table od_orders as (
     left join dwh_redshift_logistic.v_clg_zones z on lo.rdbms_id = z.rdbms_id and lo.city_id = z.city_id and lo.zone_id = z.zone_id and lo.country_code = z.country_code
     inner join fct_orders o on c.dwh_country_id = o.dwh_country_id and lo.company_id = o.dwh_company_id and lo.platform_order_code = o.order_id);
 
+select getdate() od_orders_completed;
+
 drop table if exists deliveries_filtered;
 create temp table deliveries_filtered as (
     select
@@ -182,6 +190,8 @@ create temp table deliveries_filtered as (
     from (select entity_display_name, order_id,country_code, to_customer_time from dwh_redshift_logistic.v_clg_deliveries) de
     inner join (select city_id,zone_id,order_date,delivery_date,log_order_id, entity_display_name,country_code from od_orders) o
     on de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id and de.country_code = o.country_code);
+
+select getdate() deliveries_filtered_completed;
 
 drop table if exists orders;
 create temp table orders as (
@@ -231,6 +241,8 @@ select
     where date >= current_date - 90
     group by 1,2,3,4,5,6,7,8,9,12,13,25);
 
+select getdate() orders_completed;
+
 drop table if exists deliveries;
 create temp table deliveries as (
     select
@@ -249,6 +261,8 @@ create temp table deliveries as (
     where delivery_date >= current_date - 90
     group by 1,2,3,4,5);
 
+select getdate() deliveries_completed;
+
 drop table if exists shifts;
 create temp table shifts as (
     select
@@ -256,6 +270,8 @@ create temp table shifts as (
     from (select rdbms_id,city_id,zone_id,created_date,actual_working_time from dwh_redshift_logistic.v_clg_shifts) s
     where s.created_date >= current_date - 90
     group by 1,2,3,4);
+
+select getdate() shifts_completed;
 
 drop table if exists distinct_data;
 create temp table distinct_data as (
@@ -268,6 +284,8 @@ create temp table distinct_data as (
         count(distinct(restaurant_id)) as Distinct_Restaurants
     from (select entity_display_name,city_id,zone_id,order_date,analytical_customer_id,restaurant_id from od_orders) o
     group by 1,2,3,4);
+
+select getdate() distinct_data_completed;
 
 drop table if exists weekly_frequency;
 create temp table weekly_frequency as (
@@ -282,6 +300,8 @@ create temp table weekly_frequency as (
     inner join (select entity_display_name,city_id,zone_id,analytical_customer_id,order_qty,order_date from od_orders) o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
     where d.iso_date >= current_date - 90
     group by 1,2,3,4);
+
+select getdate() weekly_frequency_completed;
 
 /*drop table if exists city_id_dictionary;
 create temp table city_id_dictionary as (
@@ -342,3 +362,5 @@ INSERT INTO    dwh_bl.tableau_pricing_report
     left join distinct_data dd on o.entity_display_name = dd.entity_display_name and o.city_id = dd.city_id and o.zone_id = dd.zone_id and o.date = dd.order_date
     left join weekly_frequency w on o.entity_display_name = w.entity_display_name and o.city_id = w.city_id and o.zone_id = w.zone_id and o.date = w.iso_date
     left join dwh_il.dim_countries co on o.source_id = co.source_id);
+
+select getdate() pricing_report_completed;
