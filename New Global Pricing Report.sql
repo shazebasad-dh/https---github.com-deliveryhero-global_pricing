@@ -1,3 +1,30 @@
+create table
+insert trunc
+add the dates and replace the the date filters
+
+/*DROP TABLE dwh_bl.tableau_monthly_report_city;
+CREATE TABLE IF NOT EXISTS dwh_bl.tableau_monthly_report_city
+(
+    source_id                               SMALLINT
+    ,management_entity_group                VARCHAR(20)
+    ,display_name                           VARCHAR(30)
+    ,region                                 VARCHAR(10)
+    ,country                                VARCHAR(30)
+    ,customers_total_od_restaurant_mom      INT4
+    ,population                             INT4
+)
+DISTSTYLE ALL
+;
+*/
+
+dates AS(
+SELECT DISTINCT
+    first_day_of_month AS report_month
+FROM dwh_il.dim_date
+    WHERE first_day_of_month < DATE_TRUNC('MONTH', CURRENT_DATE)
+    AND first_day_of_month > DATEADD('MONTH',-25, DATE_TRUNC('MONTH', CURRENT_DATE)) --> between current_date - 90 - 7 and current_date
+)
+
 drop table if exists fct_orders;
 create temp table fct_orders as (
     select
@@ -143,8 +170,8 @@ create temp table od_orders as (
         o.amt_voucher_other_eur, o.amt_voucher_other_lc,
         o.is_acquisition, o.is_sent, o.order_qty
     from log_orders lo
-    left join (select region,dwh_country_id,rdbms_id from dwh_redshift_pd_il.dim_countries) c on lo.rdbms_id = c.rdbms_id
-    left join (select rdbms_id,city_id,country_code,name from dwh_redshift_logistic.v_clg_cities) lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id and lo.country_code = lc.country_code
+    left join (select region, dwh_country_id, rdbms_id from dwh_redshift_pd_il.dim_countries) c on lo.rdbms_id = c.rdbms_id
+    left join (select rdbms_id, city_id, country_code, name from dwh_redshift_logistic.v_clg_cities) lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id and lo.country_code = lc.country_code
     left join dwh_redshift_logistic.v_clg_zones z on lo.rdbms_id = z.rdbms_id and lo.city_id = z.city_id and lo.zone_id = z.zone_id and lo.country_code = z.country_code
     inner join fct_orders o on c.dwh_country_id = o.dwh_country_id and lo.company_id = o.dwh_company_id and lo.platform_order_code = o.order_id);
 
@@ -256,8 +283,48 @@ create temp table weekly_frequency as (
     where d.iso_date >= current_date - 90
     group by 1,2,3,4);
 
-drop table if exists pricing_report;
-create temp table pricing_report as (
+/*drop table if exists city_id_dictionary;
+create temp table city_id_dictionary as (
+    select country_iso, backend_city_id, backend_city, hurrier_city_id, hurrier_city_name from (
+        select l.country_iso, o.backend_city_id, o.backend_city, l.hurrier_city_id, l.hurrier_city_name,
+        row_number() over (partition by l.country_iso, o.backend_city_id order by count desc) as rank, count(*)
+        from
+            (select lco.country_iso, lo.city_id hurrier_city_id, lc.name hurrier_city_name, lo.platform_order_code
+                from dwh_redshift_logistic.v_clg_orders lo
+                left join dwh_redshift_logistic.v_clg_countries lco on lo.rdbms_id = lco.rdbms_id
+                left join dwh_redshift_logistic.v_clg_cities lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id
+                where lo.order_status = 'completed' and lo.order_placed_at > current_date - 90) l
+        left join
+            (select co.country_iso, o.city_id backend_city_id, c.city_name_english backend_city, order_id, o.source_id, c.source_id
+                from dwh_il.ranked_fct_order o
+                left join dwh_il.dim_countries co on o.source_id = co.source_id
+                left join dwh_il.dim_city c on o.source_id = c.source_id and o.city_id = c.city_id
+                where o.is_sent and o.order_date > current_date - 90 and co.source_id <> 1) o on l.country_iso = o.country_iso and l.platform_order_code = o.order_id
+        group by 1,2,3,4,5
+        order by 1 asc, 3 asc, 7 desc)
+    where rank = 1)
+​
+drop table if exists active_restaurants;
+create temp table active_restaurants as (
+    select
+        rest.source_id,
+        rest.city_id,
+        hist.valid_at,
+        count(distinct hist.restaurant_id) as number_of_restaurants
+    from dwh_il_pd.dim_restaurant_history hist
+    join  dwh_il_pd.dim_restaurant as rest
+        on rest.source_id = hist.source_id
+        and rest.restaurant_id = hist.restaurant_id
+    where rest.source_id > 0
+        and hist.is_online
+        and hist.valid_at >= current_date - 60
+    group by hist.valid_at, rest.source_id, rest.city_id
+    order by hist.valid_at);*/
+
+--drop table if exists pricing_report;
+--create temp table pricing_report as (
+TRUNCATE TABLE dwh_bl.tableau_pricing_report;
+INSERT INTO    dwh_bl.tableau_pricing_report
     select
         co.management_entity_group as Management_Entity_Group,
         co.company_name as Company_Name,
