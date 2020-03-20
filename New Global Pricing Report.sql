@@ -364,7 +364,7 @@ create temp table city_id_dictionary as (
         group by 1,2,3,4,5
         order by 1 asc, 3 asc, 7 desc)
     where rank = 1);
-​
+
 drop table if exists active_restaurants;
 create temp table active_restaurants as (
     select
