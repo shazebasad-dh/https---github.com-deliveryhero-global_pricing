@@ -1,13 +1,85 @@
+DROP TABLE dwh_bl.tableau_pricing_report;
+CREATE TABLE IF NOT EXISTS dwh_bl.tableau_pricing_report
+(
+    management_entity_group VARCHAR(48)   ENCODE lzo
+    ,company_name VARCHAR(32)   ENCODE lzo
+    ,country VARCHAR(32)   ENCODE lzo
+    ,country_iso VARCHAR(4)   ENCODE lzo
+    ,currency VARCHAR(8)   ENCODE lzo
+    ,"region" VARCHAR(14)   ENCODE lzo
+    ,entity_display_name VARCHAR(1024)   ENCODE lzo
+    ,source_id INTEGER   ENCODE az64
+    ,rdbms_id INTEGER   ENCODE az64
+    ,city VARCHAR(2000)   ENCODE lzo
+    ,city_id INTEGER   ENCODE az64
+    ,"zone" VARCHAR(2000)   ENCODE lzo
+    ,zone_id INTEGER   ENCODE az64
+    ,date DATE   ENCODE az64
+    ,nps_scores NUMERIC(38,1)   ENCODE az64
+    ,nps_responses BIGINT   ENCODE az64
+    ,df_lc NUMERIC(19,2)   ENCODE az64
+    ,log_df_lc BIGINT   ENCODE az64
+    ,paid_lc NUMERIC(38,2)   ENCODE az64
+    ,cv_lc NUMERIC(38,2)   ENCODE az64
+    ,voucher_dh_lc NUMERIC(38,2)   ENCODE az64
+    ,voucher_other_lc NUMERIC(38,2)   ENCODE az64
+    ,discount_dh_lc NUMERIC(38,2)   ENCODE az64
+    ,discount_other_lc NUMERIC(38,2)   ENCODE az64
+    ,revenue_dh_lc NUMERIC(38,2)   ENCODE az64
+    ,commission_lc NUMERIC(38,2)   ENCODE az64
+    ,joker_lc NUMERIC(38,2)   ENCODE az64
+    ,delivery_fee_lc NUMERIC(38,2)   ENCODE az64
+    ,log_delivery_fee_lc BIGINT   ENCODE az64
+    ,df_eur NUMERIC(19,2)   ENCODE az64
+    ,paid_eur NUMERIC(38,2)   ENCODE az64
+    ,cv_eur NUMERIC(38,2)   ENCODE az64
+    ,voucher_dh_eur NUMERIC(38,2)   ENCODE az64
+    ,voucher_other_eur NUMERIC(38,2)   ENCODE az64
+    ,discount_dh_eur NUMERIC(38,2)   ENCODE az64
+    ,discount_other_eur NUMERIC(38,2)   ENCODE az64
+    ,revenue_dh_eur NUMERIC(38,2)   ENCODE az64
+    ,commission_eur NUMERIC(38,2)   ENCODE az64
+    ,joker_eur NUMERIC(38,2)   ENCODE az64
+    ,delivery_fee_eur NUMERIC(38,2)   ENCODE az64
+    ,newcustomers DOUBLE PRECISION   ENCODE RAW
+    ,orders DOUBLE PRECISION   ENCODE RAW
+    ,drivingtimebucket VARCHAR(5)   ENCODE lzo
+    ,totaldrivingtime BIGINT   ENCODE az64
+    ,totaldrivingswithtime BIGINT   ENCODE az64
+    ,deliveries BIGINT   ENCODE az64
+    ,actualworkingtimeinsec BIGINT   ENCODE az64
+    ,distinct_customers BIGINT   ENCODE az64
+    ,distinct_restaurants BIGINT   ENCODE az64
+    ,week_valid_customers BIGINT   ENCODE az64
+    ,week_valid_orders DOUBLE PRECISION   ENCODE RAW
+    ,Number_of_Restaurants DOUBLE PRECISION   ENCODE RAW
+)
+DISTSTYLE ALL
+;
+
+
+/*
+drop table if exists date;
+create temp table date AS(
+SELECT DISTINCT
+    first_day_of_month AS report_month
+FROM dwh_il.dim_date
+    WHERE first_day_of_month < DATE_TRUNC('MONTH', CURRENT_DATE)
+    AND first_day_of_month > DATEADD('MONTH',-25, DATE_TRUNC('MONTH', CURRENT_DATE)) --> between current_date - 90 - 7 and current_date
+);
+*/
+
+
+select getdate() script_started;
+
 drop table if exists fct_orders;
 create temp table fct_orders as (
     select
         co.dwh_company_id,
         co.dwh_country_id,
         case when o.source_id = 68 then 40 else o.source_id end source_id, -- OnlinePizza switched to Foodora Sweden on 2019-12-06 12:34:05
-        coalesce(o.city_name_english, o.city_name_local) backend_city,
-         o.city_id backend_city_id,
-         o.restaurant_id,
-         o.analytical_customer_id,
+        o.restaurant_id,
+        o.analytical_customer_id,
         o.order_date::date,
         case
             when o.source_id in (39, 97, 143, 32) then o.order_number -- 39: Austria; 97: Hungary; 143: Sweden; 32: Turkey --> entities that only order_number can be used to join with platform_order_code
@@ -32,12 +104,12 @@ create temp table fct_orders as (
         o.amt_voucher_dh_eur, o.amt_voucher_dh_lc,
         o.amt_voucher_other_eur, o.amt_voucher_other_lc,
         o.is_acquisition, o.is_sent, o.order_qty
-    from (select o.*, c.city_name_english, c.city_name_local from dwh_il.ranked_fct_order o
-            left join (select source_id,restaurant_id, city_id from dwh_il.dim_restaurant) r on o.source_id = r.source_id and o.restaurant_id = r.restaurant_id
-            left join (select source_id, city_id, city_name_local, city_name_english from dwh_il.dim_city) c on r.source_id = c.source_id and r.city_id = c.city_id
-        where not (o.is_cancelled or o.is_declined or o.is_failed) and o.source_id > 0 and o.order_date between current_date - 90 - 7 and current_date) o
-    left join (select dwh_company_id,dwh_country_id,source_id from dwh_il.dim_countries) co on o.source_id = co.source_id
-    left join (select nps,order_id,source_id from dwh_il.fct_nps_ao) nps on o.order_id = nps.order_id and o.source_id = nps.source_id);
+    from dwh_il.ranked_fct_order o
+    left join dwh_il.dim_countries co on o.source_id = co.source_id
+    left join dwh_il.fct_nps_ao nps on o.order_id = nps.order_id and o.source_id = nps.source_id
+    where not (o.is_cancelled or o.is_declined or o.is_failed) and o.source_id > 0 and o.order_date between current_date - 90 - 7 and current_date);
+
+select getdate() fct_orders_completed;
 
 drop table if exists log_orders;
 create temp table log_orders as (
@@ -114,8 +186,10 @@ create temp table log_orders as (
         --orders data--
         lo.platform_order_code, lo.order_placed_at::date as delivery_date, lo.order_id, lo.delivery_fee/100 as log_df_lc
     from dwh_redshift_logistic.v_clg_orders lo
-    left join (select vendor_name, vendor_code,vendor_id,rdbms_id, city_id from dwh_redshift_logistic.v_clg_vendors) v using(rdbms_id, city_id, vendor_id)
+    left join dwh_redshift_logistic.v_clg_vendors v using(rdbms_id, city_id, vendor_id)
     where lo.order_status = 'completed');
+
+select getdate() log_orders_completed;
 
 drop table if exists od_orders;
 create temp table od_orders as (
@@ -125,7 +199,7 @@ create temp table od_orders as (
         --country--
         lo.country_code, o.source_id, lo.rdbms_id,
         --city--
-        lc.name as city_name, lc.city_id, o.backend_city, o.backend_city_id,
+        lc.name as city_name, lc.city_id,
         --zone--
         z.name as zone_name, z.zone_id as zone_id,
         --orders data--
@@ -143,18 +217,22 @@ create temp table od_orders as (
         o.amt_voucher_other_eur, o.amt_voucher_other_lc,
         o.is_acquisition, o.is_sent, o.order_qty
     from log_orders lo
-    left join (select region,dwh_country_id,rdbms_id from dwh_redshift_pd_il.dim_countries) c on lo.rdbms_id = c.rdbms_id
-    left join (select rdbms_id,city_id,country_code,name from dwh_redshift_logistic.v_clg_cities) lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id and lo.country_code = lc.country_code
+    left join dwh_redshift_pd_il.dim_countries c on lo.rdbms_id = c.rdbms_id
+    left join dwh_redshift_logistic.v_clg_cities lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id and lo.country_code = lc.country_code
     left join dwh_redshift_logistic.v_clg_zones z on lo.rdbms_id = z.rdbms_id and lo.city_id = z.city_id and lo.zone_id = z.zone_id and lo.country_code = z.country_code
     inner join fct_orders o on c.dwh_country_id = o.dwh_country_id and lo.company_id = o.dwh_company_id and lo.platform_order_code = o.order_id);
+
+select getdate() od_orders_completed;
 
 drop table if exists deliveries_filtered;
 create temp table deliveries_filtered as (
     select
         de.entity_display_name, o.city_id, o.zone_id, o.order_date, o.delivery_date, o.log_order_id, de.to_customer_time
-    from (select entity_display_name, order_id,country_code, to_customer_time from dwh_redshift_logistic.v_clg_deliveries) de
-    inner join (select city_id,zone_id,order_date,delivery_date,log_order_id, entity_display_name,country_code from od_orders) o
+    from dwh_redshift_logistic.v_clg_deliveries de
+    inner join od_orders o
     on de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id and de.country_code = o.country_code);
+
+select getdate() deliveries_filtered_completed;
 
 drop table if exists orders;
 create temp table orders as (
@@ -204,6 +282,8 @@ select
     where date >= current_date - 90
     group by 1,2,3,4,5,6,7,8,9,12,13,25);
 
+select getdate() orders_completed;
+
 drop table if exists deliveries;
 create temp table deliveries as (
     select
@@ -222,13 +302,17 @@ create temp table deliveries as (
     where delivery_date >= current_date - 90
     group by 1,2,3,4,5);
 
+select getdate() deliveries_completed;
+
 drop table if exists shifts;
 create temp table shifts as (
     select
         s.rdbms_id, s.city_id, s.zone_id, s.created_date as shift_date, sum(s.actual_working_time) as ActualWorkingTimeInSec
-    from (select rdbms_id,city_id,zone_id,created_date,actual_working_time from dwh_redshift_logistic.v_clg_shifts) s
+    from dwh_redshift_logistic.v_clg_shifts s
     where s.created_date >= current_date - 90
     group by 1,2,3,4);
+
+select getdate() shifts_completed;
 
 drop table if exists distinct_data;
 create temp table distinct_data as (
@@ -239,8 +323,10 @@ create temp table distinct_data as (
         o.order_date,
         count(distinct(analytical_customer_id)) as Distinct_Customers,
         count(distinct(restaurant_id)) as Distinct_Restaurants
-    from (select entity_display_name,city_id,zone_id,order_date,analytical_customer_id,restaurant_id from od_orders) o
+    from od_orders o
     group by 1,2,3,4);
+
+select getdate() distinct_data_completed;
 
 drop table if exists weekly_frequency;
 create temp table weekly_frequency as (
@@ -251,13 +337,52 @@ create temp table weekly_frequency as (
         d.iso_date,
         count(distinct o.analytical_customer_id) as Week_Valid_Customers,
         sum(o.order_qty) as Week_Valid_Orders
-    from (select iso_date from dwh_il.dim_date) d
-    inner join (select entity_display_name,city_id,zone_id,analytical_customer_id,order_qty,order_date from od_orders) o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
+    from dwh_il.dim_date d
+    inner join od_orders o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
     where d.iso_date >= current_date - 90
     group by 1,2,3,4);
 
-drop table if exists pricing_report;
-create temp table pricing_report as (
+select getdate() weekly_frequency_completed;
+
+drop table if exists city_id_dictionary;
+create temp table city_id_dictionary as (
+    select country_iso, backend_city_id, backend_city, hurrier_city_id, hurrier_city_name from (
+        select l.country_iso, o.backend_city_id, o.backend_city, l.hurrier_city_id, l.hurrier_city_name,
+        row_number() over (partition by l.country_iso, o.backend_city_id order by count desc) as rank, count(*)
+        from
+            (select lco.country_iso, lo.city_id hurrier_city_id, lc.name hurrier_city_name, lo.platform_order_code
+                from dwh_redshift_logistic.v_clg_orders lo
+                left join dwh_redshift_logistic.v_clg_countries lco on lo.rdbms_id = lco.rdbms_id
+                left join dwh_redshift_logistic.v_clg_cities lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id
+                where lo.order_status = 'completed' and lo.order_placed_at > current_date - 90) l
+        left join
+            (select co.country_iso, o.city_id backend_city_id, c.city_name_english backend_city, order_id, o.source_id, c.source_id
+                from dwh_il.ranked_fct_order o
+                left join dwh_il.dim_countries co on o.source_id = co.source_id
+                left join dwh_il.dim_city c on o.source_id = c.source_id and o.city_id = c.city_id
+                where o.is_sent and o.order_date > current_date - 90 and co.source_id <> 1) o on l.country_iso = o.country_iso and l.platform_order_code = o.order_id
+        group by 1,2,3,4,5
+        order by 1 asc, 3 asc, 7 desc)
+    where rank = 1);
+​
+drop table if exists active_restaurants;
+create temp table active_restaurants as (
+    select
+        rest.source_id,
+        rest.city_id as backend_city_id,
+        c.hurrier_city_id as city_id,
+        hist.valid_at,
+        count(distinct hist.restaurant_id) as number_of_restaurants
+    from dwh_il_pd.dim_restaurant_history hist
+    join  dwh_il_pd.dim_restaurant as rest on rest.source_id = hist.source_id and rest.restaurant_id = hist.restaurant_id
+    join city_id_dictionary c on rest.city_id=c.backend_city_id
+    where rest.source_id > 0 and hist.is_online and hist.valid_at >= current_date - 90
+    group by hist.valid_at, rest.source_id, rest.city_id, c.hurrier_city_id
+    order by hist.valid_at);
+
+
+TRUNCATE TABLE dwh_bl.tableau_pricing_report;
+INSERT INTO    dwh_bl.tableau_pricing_report
     select
         co.management_entity_group as Management_Entity_Group,
         co.company_name as Company_Name,
@@ -268,10 +393,12 @@ create temp table pricing_report as (
         d.DrivingTimeBucket, d.TotalDrivingTime, d.TotalDrivingsWithTime, d.Deliveries,
         s.ActualWorkingTimeInSec,
         dd.Distinct_Customers, dd.Distinct_Restaurants,
-        w.Week_Valid_Customers, w.Week_Valid_Orders
+        w.Week_Valid_Customers, w.Week_Valid_Orders,
+        r.number_of_restaurants as Number_of_Restaurants
     from orders o
     left join deliveries d on o.entity_display_name = d.entity_display_name and o.city_id = d.city_id and o.zone_id = d.zone_id and o.date = d.delivery_date
     left join shifts s on o.rdbms_id = s.rdbms_id and o.city_id = s.city_id and o.zone_id = s.zone_id and o.date = s.shift_date
     left join distinct_data dd on o.entity_display_name = dd.entity_display_name and o.city_id = dd.city_id and o.zone_id = dd.zone_id and o.date = dd.order_date
     left join weekly_frequency w on o.entity_display_name = w.entity_display_name and o.city_id = w.city_id and o.zone_id = w.zone_id and o.date = w.iso_date
+    left join active_restaurants r on o.city_id = r.city_id and o.source_id = r.source_id
     left join dwh_il.dim_countries co on o.source_id = co.source_id);
