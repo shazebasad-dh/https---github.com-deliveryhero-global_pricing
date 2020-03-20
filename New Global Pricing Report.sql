@@ -1,5 +1,7 @@
-DROP TABLE dwh_bl.tableau_pricing_report;
-CREATE TABLE IF NOT EXISTS dwh_bl.tableau_pricing_report
+set enable_result_cache_for_session to off;
+
+drop table bi_global_pricing_dev.tableau_pricing_report;
+create table if not exists bi_global_pricing_dev.tableau_pricing_report
 (
   management_entity_group         VARCHAR(30)     ENCODE lzo
   ,company_name                   VARCHAR(30)     ENCODE lzo
@@ -54,104 +56,98 @@ CREATE TABLE IF NOT EXISTS dwh_bl.tableau_pricing_report
   ,week_valid_orders              INTEGER         ENCODE az64
   ,number_of_restaurants          INTEGER         ENCODE az64
 )
-DISTSTYLE ALL
+diststyle all
 ;
 
 select getdate() script_started;
 
-
 drop table if exists construct;
-CREATE TEMPORARY TABLE construct
---distkey(report_date)
-AS
-WITH platform AS(
-SELECT DISTINCT
-    entity_display_name,
-    lo.rdbms_id,
-    country_code,
-    case entity_display_name
-        when 'Appetito24' THEN 57
-        when 'Boozer' THEN 34
-        when 'Burger King - Singapore' THEN 45
-        when 'CD - Colombia' THEN 7
-        when 'CG - Bahrain' THEN 54
-        when 'CG - Kuwait' THEN 54
-        when 'CG - Qatar' THEN 54
-        when 'CG - Saudi Arabia' THEN 54
-        when 'CG - UAE' THEN 54
-        when 'Carriage - Egypt' THEN 54
-        when 'DN - Serbia' THEN 47
-        when 'DN - Bosnia and Herzegovina' THEN 47 -- Not 'joinable' as of 2020-01-15 (DATA-3784), but data is present in BigQuery
-        when 'Damejidlo' THEN 20
-        when 'Deliveras' THEN 58 -- Not 'joinable' as of 2020-01-15 (DATA-3784)
-        when 'FD - Austria' THEN 34 -- Deprecated on 2019-11-26
-        when 'FD - Canada' THEN 34
-        when 'FD - Finland' THEN 34
-        when 'FD - Norway' THEN 34
-        when 'FD - Sweden' THEN 27 -- Switched to Online Pizza which was rebranded as foodora Sweden on 2020-01-09
-        when 'FP - Bangladesh' THEN 45
-        when 'FP - Bulgaria' THEN 45
-        when 'FP - Cambodia' THEN 45
-        when 'FP - Hong Kong' THEN 45
-        when 'FP - Laos' THEN 45
-        when 'FP - Malaysia' THEN 45
-        when 'FP - Myanmar' THEN 45
-        when 'FP - Pakistan' THEN 45
-        when 'FP - Philippines' THEN 45
-        when 'FP - Romania' THEN 45
-        when 'FP - Singapore' THEN 45
-        when 'FP - Taiwan' THEN 45
-        when 'FP - Thailand' THEN 45
-        when 'Hip Menu - Romania' THEN 60 -- Deprecated on 2019-12-10, order_code is encrypted
-        when 'Hungerstation - Bahrain' THEN 53
-        when 'Hungerstation - SA' THEN 53
-        when 'Hungrig Sweden' THEN 65
-        when 'Mjam' THEN 28
-        when 'Netpincer' THEN 51
-        when 'Onlinepizza Sweden' THEN 27
-        when 'Otlob' THEN 55
-        when 'Pauza' THEN 46
-        when 'Pizza-Online Finland' THEN 3
-        when 'PY - Argentina' THEN 6
-        when 'PY - Bolivia' THEN 6
-        when 'PY - Chile' THEN 6
-        when 'PY - Dominican Republic' THEN 6
-        when 'PY - Paraguay' THEN 6
-        when 'PY - Uruguay' THEN 6
-        when 'TB - Bahrain' THEN 25
-        when 'TB - Jordan' THEN 25
-        when 'TB - Kuwait' THEN 25
-        when 'TB - Oman' THEN 25
-        when 'TB - Qatar' THEN 25
-        when 'TB - UAE' THEN 25
-        when 'Walmart - Canada' THEN 34
-        when 'Yemeksepeti' THEN 21
-        when 'ZO - UAE' THEN 64
-        end company_id,
-      dwh_country_id
-FROM dwh_redshift_logistic.v_clg_orders lo
-left join dwh_redshift_pd_il.dim_countries c on lo.rdbms_id = c.rdbms_id
-),
-dates AS(
-SELECT DISTINCT
-    iso_date AS report_date
-FROM dwh_il.dim_date
-    WHERE iso_date <= CURRENT_DATE
-    AND iso_date >= DATEADD('day',-40, CURRENT_DATE)
-)
-SELECT *
-FROM platform AS p
-CROSS JOIN dates AS d
-where (p.entity_display_name like 'Hunger%' and d.report_date>= DATEADD('day',-40, CURRENT_DATE))
-or (p.entity_display_name not like 'Hunger%' and d.report_date>= DATEADD('day',-7, CURRENT_DATE))
-;
+create temp table construct as with
+    platform as (
+        select distinct
+            entity_display_name,
+            lo.rdbms_id,
+            country_code,
+            case entity_display_name
+                when 'Appetito24' THEN 57
+                when 'Boozer' THEN 34
+                when 'Burger King - Singapore' THEN 45
+                when 'CD - Colombia' THEN 7
+                when 'CG - Bahrain' THEN 54
+                when 'CG - Kuwait' THEN 54
+                when 'CG - Qatar' THEN 54
+                when 'CG - Saudi Arabia' THEN 54
+                when 'CG - UAE' THEN 54
+                when 'Carriage - Egypt' THEN 54
+                when 'DN - Serbia' THEN 47
+                when 'DN - Bosnia and Herzegovina' THEN 47 -- Not 'joinable' as of 2020-01-15 (DATA-3784), but data is present in BigQuery
+                when 'Damejidlo' THEN 20
+                when 'Deliveras' THEN 58 -- Not 'joinable' as of 2020-01-15 (DATA-3784)
+                when 'FD - Austria' THEN 34 -- Deprecated on 2019-11-26
+                when 'FD - Canada' THEN 34
+                when 'FD - Finland' THEN 34
+                when 'FD - Norway' THEN 34
+                when 'FD - Sweden' THEN 27 -- Switched to Online Pizza which was rebranded as foodora Sweden on 2020-01-09
+                when 'FP - Bangladesh' THEN 45
+                when 'FP - Bulgaria' THEN 45
+                when 'FP - Cambodia' THEN 45
+                when 'FP - Hong Kong' THEN 45
+                when 'FP - Laos' THEN 45
+                when 'FP - Malaysia' THEN 45
+                when 'FP - Myanmar' THEN 45
+                when 'FP - Pakistan' THEN 45
+                when 'FP - Philippines' THEN 45
+                when 'FP - Romania' THEN 45
+                when 'FP - Singapore' THEN 45
+                when 'FP - Taiwan' THEN 45
+                when 'FP - Thailand' THEN 45
+                when 'Hip Menu - Romania' THEN 60 -- Deprecated on 2019-12-10, order_code is encrypted
+                when 'Hungerstation - Bahrain' THEN 53
+                when 'Hungerstation - SA' THEN 53
+                when 'Hungrig Sweden' THEN 65
+                when 'Mjam' THEN 28
+                when 'Netpincer' THEN 51
+                when 'Onlinepizza Sweden' THEN 27
+                when 'Otlob' THEN 55
+                when 'Pauza' THEN 46
+                when 'Pizza-Online Finland' THEN 3
+                when 'PY - Argentina' THEN 6
+                when 'PY - Bolivia' THEN 6
+                when 'PY - Chile' THEN 6
+                when 'PY - Dominican Republic' THEN 6
+                when 'PY - Paraguay' THEN 6
+                when 'PY - Uruguay' THEN 6
+                when 'TB - Bahrain' THEN 25
+                when 'TB - Jordan' THEN 25
+                when 'TB - Kuwait' THEN 25
+                when 'TB - Oman' THEN 25
+                when 'TB - Qatar' THEN 25
+                when 'TB - UAE' THEN 25
+                when 'Walmart - Canada' THEN 34
+                when 'Yemeksepeti' THEN 21
+                when 'ZO - UAE' THEN 64
+                end company_id,
+              dwh_country_id
+        from dwh_redshift_logistic.v_clg_orders lo
+        left join dwh_redshift_pd_il.dim_countries c on lo.rdbms_id = c.rdbms_id),
+
+    dates as (
+        select distinct
+            iso_date AS report_date
+        from dwh_il.dim_date
+        where iso_date <= current_date
+        and iso_date >= dateadd('day',-40, current_date))
+
+    select *
+    from platform as p
+    cross join dates as d
+    where (p.entity_display_name like 'Hunger%' and d.report_date>= dateadd('day',-40, current_date))
+        or (p.entity_display_name not like 'Hunger%' and d.report_date>= dateadd('day',-7, current_date));
 
 select getdate() construct_completed;
 
 drop table if exists fct_orders;
-create temp table fct_orders
---distkey(order_date)
-as (
+create temp table fct_orders as (
     select
         co.dwh_company_id,
         co.dwh_country_id,
@@ -192,9 +188,7 @@ as (
 select getdate() fct_orders_completed;
 
 drop table if exists log_orders;
-create temp table log_orders
-distkey(delivery_date)
-as (
+create temp table log_orders as (
    select
         --region, company--
         lo.platform,
@@ -304,7 +298,6 @@ select
         sum(case when o.is_acquisition then o.order_qty else 0 end)  as NewCustomers, -- Number of first *successful* orders // first_order_all considers the first order regardless of its final status
         sum(o.order_qty)                                             as Orders
     from od_orders o
-    --where date >= current_date - 90
     group by 1,2,3,4,5,6,7,8,9,12,13,25);
 
 select getdate() orders_completed;
@@ -324,7 +317,6 @@ create temp table deliveries as (
         sum(case when de.to_customer_time is not null then 1 end)    as TotalDrivingsWithTime,
         count(*)                                                     as Deliveries
     from deliveries_filtered de
-    --where delivery_date >= current_date - 90
     group by 1,2,3,4,5);
 
 select getdate() deliveries_completed;
@@ -407,9 +399,8 @@ create temp table active_restaurants as (
     group by 1,2,3
     order by hist.valid_at);
 
-
-TRUNCATE TABLE dwh_bl.tableau_pricing_report;
-INSERT INTO    dwh_bl.tableau_pricing_report
+truncate table bi_global_pricing_dev.tableau_pricing_report;
+insert into bi_global_pricing_dev.tableau_pricing_report (
     select
         co.management_entity_group as Management_Entity_Group,
         co.company_name as Company_Name,
