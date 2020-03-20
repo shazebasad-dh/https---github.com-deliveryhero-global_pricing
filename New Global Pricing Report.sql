@@ -1,79 +1,157 @@
 DROP TABLE dwh_bl.tableau_pricing_report;
 CREATE TABLE IF NOT EXISTS dwh_bl.tableau_pricing_report
 (
-    management_entity_group VARCHAR(48)   ENCODE lzo
-    ,company_name VARCHAR(32)   ENCODE lzo
-    ,country VARCHAR(32)   ENCODE lzo
-    ,country_iso VARCHAR(4)   ENCODE lzo
-    ,currency VARCHAR(8)   ENCODE lzo
-    ,"region" VARCHAR(14)   ENCODE lzo
-    ,entity_display_name VARCHAR(1024)   ENCODE lzo
-    ,source_id INTEGER   ENCODE az64
-    ,rdbms_id INTEGER   ENCODE az64
-    ,city VARCHAR(2000)   ENCODE lzo
-    ,city_id INTEGER   ENCODE az64
-    ,"zone" VARCHAR(2000)   ENCODE lzo
-    ,zone_id INTEGER   ENCODE az64
-    ,date DATE   ENCODE az64
-    ,nps_scores NUMERIC(38,1)   ENCODE az64
-    ,nps_responses BIGINT   ENCODE az64
-    ,df_lc NUMERIC(19,2)   ENCODE az64
-    ,log_df_lc BIGINT   ENCODE az64
-    ,paid_lc NUMERIC(38,2)   ENCODE az64
-    ,cv_lc NUMERIC(38,2)   ENCODE az64
-    ,voucher_dh_lc NUMERIC(38,2)   ENCODE az64
-    ,voucher_other_lc NUMERIC(38,2)   ENCODE az64
-    ,discount_dh_lc NUMERIC(38,2)   ENCODE az64
-    ,discount_other_lc NUMERIC(38,2)   ENCODE az64
-    ,revenue_dh_lc NUMERIC(38,2)   ENCODE az64
-    ,commission_lc NUMERIC(38,2)   ENCODE az64
-    ,joker_lc NUMERIC(38,2)   ENCODE az64
-    ,delivery_fee_lc NUMERIC(38,2)   ENCODE az64
-    ,log_delivery_fee_lc BIGINT   ENCODE az64
-    ,df_eur NUMERIC(19,2)   ENCODE az64
-    ,paid_eur NUMERIC(38,2)   ENCODE az64
-    ,cv_eur NUMERIC(38,2)   ENCODE az64
-    ,voucher_dh_eur NUMERIC(38,2)   ENCODE az64
-    ,voucher_other_eur NUMERIC(38,2)   ENCODE az64
-    ,discount_dh_eur NUMERIC(38,2)   ENCODE az64
-    ,discount_other_eur NUMERIC(38,2)   ENCODE az64
-    ,revenue_dh_eur NUMERIC(38,2)   ENCODE az64
-    ,commission_eur NUMERIC(38,2)   ENCODE az64
-    ,joker_eur NUMERIC(38,2)   ENCODE az64
-    ,delivery_fee_eur NUMERIC(38,2)   ENCODE az64
-    ,newcustomers DOUBLE PRECISION   ENCODE RAW
-    ,orders DOUBLE PRECISION   ENCODE RAW
-    ,drivingtimebucket VARCHAR(5)   ENCODE lzo
-    ,totaldrivingtime BIGINT   ENCODE az64
-    ,totaldrivingswithtime BIGINT   ENCODE az64
-    ,deliveries BIGINT   ENCODE az64
-    ,actualworkingtimeinsec BIGINT   ENCODE az64
-    ,distinct_customers BIGINT   ENCODE az64
-    ,distinct_restaurants BIGINT   ENCODE az64
-    ,week_valid_customers BIGINT   ENCODE az64
-    ,week_valid_orders DOUBLE PRECISION   ENCODE RAW
-    ,Number_of_Restaurants DOUBLE PRECISION   ENCODE RAW
+  management_entity_group         VARCHAR(30)     ENCODE lzo
+  ,company_name                   VARCHAR(30)     ENCODE lzo
+  ,country                        VARCHAR(30)     ENCODE lzo
+  ,country_iso                    VARCHAR(4)      ENCODE lzo
+  ,currency                       VARCHAR(8)      ENCODE lzo
+  ,region                         VARCHAR(14)     ENCODE lzo
+  ,entity_display_name            VARCHAR(30)     ENCODE lzo
+  ,source_id                      INTEGER         ENCODE az64
+  ,rdbms_id                       INTEGER         ENCODE az64
+  ,city                           VARCHAR(50)     ENCODE lzo
+  ,city_id                        INTEGER         ENCODE az64
+  ,zone                           VARCHAR(50)     ENCODE lzo
+  ,zone_id                        INTEGER         ENCODE az64
+  ,date                           DATE            ENCODE az64
+  ,nps_scores                     INTEGER         ENCODE az64
+  ,nps_responses                  INTEGER         ENCODE az64
+  ,df_lc                          NUMERIC(19,2)   ENCODE az64
+  ,log_df_lc                      NUMERIC(36,2)   ENCODE az64
+  ,paid_lc                        NUMERIC(36,2)   ENCODE az64
+  ,cv_lc                          NUMERIC(36,2)   ENCODE az64
+  ,voucher_dh_lc                  NUMERIC(36,2)   ENCODE az64
+  ,voucher_other_lc               NUMERIC(36,2)   ENCODE az64
+  ,discount_dh_lc                 NUMERIC(36,2)   ENCODE az64
+  ,discount_other_lc              NUMERIC(36,2)   ENCODE az64
+  ,revenue_dh_lc                  NUMERIC(36,2)   ENCODE az64
+  ,commission_lc                  NUMERIC(36,2)   ENCODE az64
+  ,joker_lc                       NUMERIC(36,2)   ENCODE az64
+  ,delivery_fee_lc                NUMERIC(36,2)   ENCODE az64
+  ,log_delivery_fee_lc            NUMERIC(36,2)   ENCODE az64
+  ,df_eur                         NUMERIC(12,2)   ENCODE az64
+  ,paid_eur                       NUMERIC(12,2)   ENCODE az64
+  ,cv_eur                         NUMERIC(12,2)   ENCODE az64
+  ,voucher_dh_eur                 NUMERIC(12,2)   ENCODE az64
+  ,voucher_other_eur              NUMERIC(12,2)   ENCODE az64
+  ,discount_dh_eur                NUMERIC(12,2)   ENCODE az64
+  ,discount_other_eur             NUMERIC(12,2)   ENCODE az64
+  ,revenue_dh_eur                 NUMERIC(12,2)   ENCODE az64
+  ,commission_eur                 NUMERIC(12,2)   ENCODE az64
+  ,joker_eur                      NUMERIC(12,2)   ENCODE az64
+  ,delivery_fee_eur               NUMERIC(12,2)   ENCODE az64
+  ,newcustomers                   INTEGER         ENCODE az64
+  ,orders                         INTEGER         ENCODE az64
+  ,drivingtimebucket              VARCHAR(5)      ENCODE lzo
+  ,totaldrivingtime               INTEGER         ENCODE az64
+  ,totaldrivingswithtime          INTEGER         ENCODE az64
+  ,deliveries                     INTEGER         ENCODE az64
+  ,actualworkingtimeinsec         INTEGER         ENCODE az64
+  ,distinct_customers             INTEGER         ENCODE az64
+  ,distinct_restaurants           INTEGER         ENCODE az64
+  ,week_valid_customers           INTEGER         ENCODE az64
+  ,week_valid_orders              INTEGER         ENCODE az64
+  ,number_of_restaurants          INTEGER         ENCODE az64
 )
 DISTSTYLE ALL
 ;
 
-
-/*
-drop table if exists date;
-create temp table date AS(
-SELECT DISTINCT
-    first_day_of_month AS report_month
-FROM dwh_il.dim_date
-    WHERE first_day_of_month < DATE_TRUNC('MONTH', CURRENT_DATE)
-    AND first_day_of_month > DATEADD('MONTH',-25, DATE_TRUNC('MONTH', CURRENT_DATE)) --> between current_date - 90 - 7 and current_date
-);
-*/
-
-
 select getdate() script_started;
 
+
+drop table if exists construct;
+CREATE TEMPORARY TABLE construct
+--distkey(report_date)
+AS
+WITH platform AS(
+SELECT DISTINCT
+    entity_display_name,
+    lo.rdbms_id,
+    country_code,
+    case entity_display_name
+        when 'Appetito24' THEN 57
+        when 'Boozer' THEN 34
+        when 'Burger King - Singapore' THEN 45
+        when 'CD - Colombia' THEN 7
+        when 'CG - Bahrain' THEN 54
+        when 'CG - Kuwait' THEN 54
+        when 'CG - Qatar' THEN 54
+        when 'CG - Saudi Arabia' THEN 54
+        when 'CG - UAE' THEN 54
+        when 'Carriage - Egypt' THEN 54
+        when 'DN - Serbia' THEN 47
+        when 'DN - Bosnia and Herzegovina' THEN 47 -- Not 'joinable' as of 2020-01-15 (DATA-3784), but data is present in BigQuery
+        when 'Damejidlo' THEN 20
+        when 'Deliveras' THEN 58 -- Not 'joinable' as of 2020-01-15 (DATA-3784)
+        when 'FD - Austria' THEN 34 -- Deprecated on 2019-11-26
+        when 'FD - Canada' THEN 34
+        when 'FD - Finland' THEN 34
+        when 'FD - Norway' THEN 34
+        when 'FD - Sweden' THEN 27 -- Switched to Online Pizza which was rebranded as foodora Sweden on 2020-01-09
+        when 'FP - Bangladesh' THEN 45
+        when 'FP - Bulgaria' THEN 45
+        when 'FP - Cambodia' THEN 45
+        when 'FP - Hong Kong' THEN 45
+        when 'FP - Laos' THEN 45
+        when 'FP - Malaysia' THEN 45
+        when 'FP - Myanmar' THEN 45
+        when 'FP - Pakistan' THEN 45
+        when 'FP - Philippines' THEN 45
+        when 'FP - Romania' THEN 45
+        when 'FP - Singapore' THEN 45
+        when 'FP - Taiwan' THEN 45
+        when 'FP - Thailand' THEN 45
+        when 'Hip Menu - Romania' THEN 60 -- Deprecated on 2019-12-10, order_code is encrypted
+        when 'Hungerstation - Bahrain' THEN 53
+        when 'Hungerstation - SA' THEN 53
+        when 'Hungrig Sweden' THEN 65
+        when 'Mjam' THEN 28
+        when 'Netpincer' THEN 51
+        when 'Onlinepizza Sweden' THEN 27
+        when 'Otlob' THEN 55
+        when 'Pauza' THEN 46
+        when 'Pizza-Online Finland' THEN 3
+        when 'PY - Argentina' THEN 6
+        when 'PY - Bolivia' THEN 6
+        when 'PY - Chile' THEN 6
+        when 'PY - Dominican Republic' THEN 6
+        when 'PY - Paraguay' THEN 6
+        when 'PY - Uruguay' THEN 6
+        when 'TB - Bahrain' THEN 25
+        when 'TB - Jordan' THEN 25
+        when 'TB - Kuwait' THEN 25
+        when 'TB - Oman' THEN 25
+        when 'TB - Qatar' THEN 25
+        when 'TB - UAE' THEN 25
+        when 'Walmart - Canada' THEN 34
+        when 'Yemeksepeti' THEN 21
+        when 'ZO - UAE' THEN 64
+        end company_id,
+      dwh_country_id
+FROM dwh_redshift_logistic.v_clg_orders lo
+left join dwh_redshift_pd_il.dim_countries c on lo.rdbms_id = c.rdbms_id
+),
+dates AS(
+SELECT DISTINCT
+    iso_date AS report_date
+FROM dwh_il.dim_date
+    WHERE iso_date <= CURRENT_DATE
+    AND iso_date >= DATEADD('day',-40, CURRENT_DATE)
+)
+SELECT *
+FROM platform AS p
+CROSS JOIN dates AS d
+where (p.entity_display_name like 'Hunger%' and d.report_date>= DATEADD('day',-40, CURRENT_DATE))
+or (p.entity_display_name not like 'Hunger%' and d.report_date>= DATEADD('day',-7, CURRENT_DATE))
+;
+
+select getdate() construct_completed;
+
 drop table if exists fct_orders;
-create temp table fct_orders as (
+create temp table fct_orders
+--distkey(order_date)
+as (
     select
         co.dwh_company_id,
         co.dwh_country_id,
@@ -81,6 +159,7 @@ create temp table fct_orders as (
         o.restaurant_id,
         o.analytical_customer_id,
         o.order_date::date,
+        c.entity_display_name,
         case
             when o.source_id in (39, 97, 143, 32) then o.order_number -- 39: Austria; 97: Hungary; 143: Sweden; 32: Turkey --> entities that only order_number can be used to join with platform_order_code
             when o.source_id = 119 then 'CG-1-' + o.order_id -- Kuwait
@@ -107,75 +186,20 @@ create temp table fct_orders as (
     from dwh_il.ranked_fct_order o
     left join dwh_il.dim_countries co on o.source_id = co.source_id
     left join dwh_il.fct_nps_ao nps on o.order_id = nps.order_id and o.source_id = nps.source_id
-    where not (o.is_cancelled or o.is_declined or o.is_failed) and o.source_id > 0 and o.order_date between current_date - 90 - 7 and current_date);
+    inner join construct c on o.order_date::date = c.report_date and co.dwh_company_id = c.company_id and co.dwh_country_id = c.dwh_country_id
+    where not (o.is_cancelled or o.is_declined or o.is_failed) and o.source_id > 0);
 
 select getdate() fct_orders_completed;
 
 drop table if exists log_orders;
-create temp table log_orders as (
+create temp table log_orders
+distkey(delivery_date)
+as (
    select
         --region, company--
         lo.platform,
-        entity_display_name,
-        case lo.entity_display_name
-            when 'Appetito24' THEN 57
-            when 'Boozer' THEN 34
-            when 'Burger King - Singapore' THEN 45
-            when 'CD - Colombia' THEN 7
-            when 'CG - Bahrain' THEN 54
-            when 'CG - Kuwait' THEN 54
-            when 'CG - Qatar' THEN 54
-            when 'CG - Saudi Arabia' THEN 54
-            when 'CG - UAE' THEN 54
-            when 'Carriage - Egypt' THEN 54
-            when 'DN - Serbia' THEN 47
-            when 'DN - Bosnia and Herzegovina' THEN 47 -- Not 'joinable' as of 2020-01-15 (DATA-3784), but data is present in BigQuery
-            when 'Damejidlo' THEN 20
-            when 'Deliveras' THEN 58 -- Not 'joinable' as of 2020-01-15 (DATA-3784)
-            when 'FD - Austria' THEN 34 -- Deprecated on 2019-11-26
-            when 'FD - Canada' THEN 34
-            when 'FD - Finland' THEN 34
-            when 'FD - Norway' THEN 34
-            when 'FD - Sweden' THEN 27 -- Switched to Online Pizza which was rebranded as foodora Sweden on 2020-01-09
-            when 'FP - Bangladesh' THEN 45
-            when 'FP - Bulgaria' THEN 45
-            when 'FP - Cambodia' THEN 45
-            when 'FP - Hong Kong' THEN 45
-            when 'FP - Laos' THEN 45
-            when 'FP - Malaysia' THEN 45
-            when 'FP - Myanmar' THEN 45
-            when 'FP - Pakistan' THEN 45
-            when 'FP - Philippines' THEN 45
-            when 'FP - Romania' THEN 45
-            when 'FP - Singapore' THEN 45
-            when 'FP - Taiwan' THEN 45
-            when 'FP - Thailand' THEN 45
-            when 'Hip Menu - Romania' THEN 60 -- Deprecated on 2019-12-10, order_code is encrypted
-            when 'Hungerstation - Bahrain' THEN 53
-            when 'Hungerstation - SA' THEN 53
-            when 'Hungrig Sweden' THEN 65
-            when 'Mjam' THEN 28
-            when 'Netpincer' THEN 51
-            when 'Onlinepizza Sweden' THEN 27
-            when 'Otlob' THEN 55
-            when 'Pauza' THEN 46
-            when 'Pizza-Online Finland' THEN 3
-            when 'PY - Argentina' THEN 6
-            when 'PY - Bolivia' THEN 6
-            when 'PY - Chile' THEN 6
-            when 'PY - Dominican Republic' THEN 6
-            when 'PY - Paraguay' THEN 6
-            when 'PY - Uruguay' THEN 6
-            when 'TB - Bahrain' THEN 25
-            when 'TB - Jordan' THEN 25
-            when 'TB - Kuwait' THEN 25
-            when 'TB - Oman' THEN 25
-            when 'TB - Qatar' THEN 25
-            when 'TB - UAE' THEN 25
-            when 'Walmart - Canada' THEN 34
-            when 'Yemeksepeti' THEN 21
-            when 'ZO - UAE' THEN 64
-            end company_id,
+        lo.entity_display_name,
+        c.company_id,
         --country--
         case when lo.rdbms_id = 88 then 144 else lo.rdbms_id end rdbms_id, -- 88 (foodora Sweden) was shut down and replaced by 144 (Onlinepizza Sweden) which then was rebranded to Foodora Sweden on 2020-01-09
         lo.country_code,
@@ -187,6 +211,7 @@ create temp table log_orders as (
         lo.platform_order_code, lo.order_placed_at::date as delivery_date, lo.order_id, lo.delivery_fee/100 as log_df_lc
     from dwh_redshift_logistic.v_clg_orders lo
     left join dwh_redshift_logistic.v_clg_vendors v using(rdbms_id, city_id, vendor_id)
+    inner join construct c on lo.entity_display_name = c.entity_display_name and lo.country_code = c.country_code and lo.order_placed_at::date = c.report_date
     where lo.order_status = 'completed');
 
 select getdate() log_orders_completed;
@@ -279,7 +304,7 @@ select
         sum(case when o.is_acquisition then o.order_qty else 0 end)  as NewCustomers, -- Number of first *successful* orders // first_order_all considers the first order regardless of its final status
         sum(o.order_qty)                                             as Orders
     from od_orders o
-    where date >= current_date - 90
+    --where date >= current_date - 90
     group by 1,2,3,4,5,6,7,8,9,12,13,25);
 
 select getdate() orders_completed;
@@ -299,7 +324,7 @@ create temp table deliveries as (
         sum(case when de.to_customer_time is not null then 1 end)    as TotalDrivingsWithTime,
         count(*)                                                     as Deliveries
     from deliveries_filtered de
-    where delivery_date >= current_date - 90
+    --where delivery_date >= current_date - 90
     group by 1,2,3,4,5);
 
 select getdate() deliveries_completed;
@@ -309,7 +334,7 @@ create temp table shifts as (
     select
         s.rdbms_id, s.city_id, s.zone_id, s.created_date as shift_date, sum(s.actual_working_time) as ActualWorkingTimeInSec
     from dwh_redshift_logistic.v_clg_shifts s
-    where s.created_date >= current_date - 90
+    inner join construct c on s.country_code = c.country_code and s.rdbms_id = c.rdbms_id and s.created_date = c.report_date
     group by 1,2,3,4);
 
 select getdate() shifts_completed;
@@ -339,7 +364,7 @@ create temp table weekly_frequency as (
         sum(o.order_qty) as Week_Valid_Orders
     from dwh_il.dim_date d
     inner join od_orders o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
-    where d.iso_date >= current_date - 90
+    where d.iso_date >= current_date - 40
     group by 1,2,3,4);
 
 select getdate() weekly_frequency_completed;
@@ -369,15 +394,17 @@ drop table if exists active_restaurants;
 create temp table active_restaurants as (
     select
         rest.source_id,
-        rest.city_id as backend_city_id,
-        c.hurrier_city_id as city_id,
-        hist.valid_at,
+        city.hurrier_city_id as city_id,
+        hist.valid_at as date,
         count(distinct hist.restaurant_id) as number_of_restaurants
     from dwh_il_pd.dim_restaurant_history hist
     join  dwh_il_pd.dim_restaurant as rest on rest.source_id = hist.source_id and rest.restaurant_id = hist.restaurant_id
-    join city_id_dictionary c on rest.city_id=c.backend_city_id
-    where rest.source_id > 0 and hist.is_online and hist.valid_at >= current_date - 90
-    group by hist.valid_at, rest.source_id, rest.city_id, c.hurrier_city_id
+    join city_id_dictionary city on rest.city_id=city.backend_city_id
+    inner join (select o.source_id, o.city_id, co.entity_display_name, co.report_date from construct co join orders o
+      on co.entity_display_name=o.entity_display_name and co.rdbms_id = o.rdbms_id) con
+    on rest.source_id = con.source_id and city.hurrier_city_id = con.city_id and hist.valid_at = con.report_date
+    where rest.source_id > 0 and hist.is_online
+    group by 1,2,3
     order by hist.valid_at);
 
 
@@ -400,5 +427,5 @@ INSERT INTO    dwh_bl.tableau_pricing_report
     left join shifts s on o.rdbms_id = s.rdbms_id and o.city_id = s.city_id and o.zone_id = s.zone_id and o.date = s.shift_date
     left join distinct_data dd on o.entity_display_name = dd.entity_display_name and o.city_id = dd.city_id and o.zone_id = dd.zone_id and o.date = dd.order_date
     left join weekly_frequency w on o.entity_display_name = w.entity_display_name and o.city_id = w.city_id and o.zone_id = w.zone_id and o.date = w.iso_date
-    left join active_restaurants r on o.city_id = r.city_id and o.source_id = r.source_id
+    left join active_restaurants r on o.city_id = r.city_id and o.source_id = r.source_id and o.date = r.date
     left join dwh_il.dim_countries co on o.source_id = co.source_id);
