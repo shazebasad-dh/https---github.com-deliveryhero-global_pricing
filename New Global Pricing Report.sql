@@ -1,4 +1,4 @@
-set enable_result_cache_for_session to off;
+--set enable_result_cache_for_session to off;
 
 drop table if exists run_time;
 create temp table run_time as (select '1. Script started'::VARCHAR(50) event, getdate() run_time);
@@ -466,10 +466,15 @@ insert into bi_global_pricing_dev.tableau_pricing_report (
         co.currency_code as Currency,
         co.region as Region,
         o.*,
-        d.DrivingTimeBucket, d.TotalDrivingTime, d.TotalDrivingsWithTime, d.Deliveries,
+        d.DrivingTimeBucket,
+        d.TotalDrivingTime,
+        d.TotalDrivingsWithTime,
+        d.Deliveries,
         s.ActualWorkingTimeInSec,
-        dd.Distinct_Customers, dd.Distinct_Restaurants,
-        w.Week_Valid_Customers, w.Week_Valid_Orders,
+        dd.Distinct_Customers,
+        dd.Distinct_Restaurants,
+        w.Week_Valid_Customers,
+        w.Week_Valid_Orders,
         r.number_of_od_restaurants as Number_of_OD_Restaurants,
         r.number_of_restaurants as Number_of_Restaurants
     from orders o
