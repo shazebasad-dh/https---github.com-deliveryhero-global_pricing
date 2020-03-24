@@ -352,7 +352,7 @@ create temp table deliveries as (
         sum(case when de.to_customer_time is not null then 1 end)    as TotalDrivingsWithTime,
         count(*)                                                     as Deliveries
     from dwh_redshift_logistic.v_clg_deliveries de
-    inner join od_orders o on de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id and de.country_code = o.country_code
+    inner join od_orders o on de.rdbms_id = o.rdbms_id and de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id
     group by 1,2,3,4,5,6);
 
 insert into run_time (select '10. Temp table deliveries created' event, getdate() run_time);
@@ -360,9 +360,13 @@ insert into run_time (select '10. Temp table deliveries created' event, getdate(
 drop table if exists shifts;
 create temp table shifts as (
     select
-        s.rdbms_id, s.city_id, s.zone_id, s.created_date as shift_date, sum(s.actual_working_time) as ActualWorkingTimeInSec
+        s.rdbms_id,
+        s.city_id,
+        s.zone_id,
+        s.created_date as shift_date,
+        sum(s.actual_working_time) as ActualWorkingTimeInSec
     from dwh_redshift_logistic.v_clg_shifts s
-    inner join construct_logistic c on s.country_code = c.country_code and s.rdbms_id = c.rdbms_id and s.created_date = c.report_date
+    inner join (select rdbms_id, report_date from construct_logistic c group by 1,2) c on s.rdbms_id = c.rdbms_id and s.created_date = c.report_date
     group by 1,2,3,4);
 
 insert into run_time (select '11. Temp table shifts created' event, getdate() run_time);
@@ -401,28 +405,22 @@ insert into run_time (select '13. Temp table weekly_frequency created' event, ge
 
 drop table if exists city_id_dictionary;
 create temp table city_id_dictionary as (
-    select country_iso, backend_city_id, backend_city, hurrier_city_id, hurrier_city_name from (
-        select l.country_iso, o.backend_city_id, o.backend_city, l.hurrier_city_id, l.hurrier_city_name,
-        row_number() over (partition by l.country_iso, o.backend_city_id order by count desc) as rank, count(*)
+    select
+        country_iso,
+        backend_city_id,
+        backend_city,
+        hurrier_city_id,
+        hurrier_city_name
+    from (select l.country_iso, o.backend_city_id, o.backend_city, l.hurrier_city_id, l.hurrier_city_name, row_number() over (partition by l.country_iso, o.backend_city_id order by count desc) as rank, count(*)
         from
-            (select
-                lco.country_iso,
-                lo.city_id as hurrier_city_id,
-                lc.name as hurrier_city_name,
-                lo.platform_order_code
+            (select lco.country_iso, lo.city_id as hurrier_city_id, lc.name as hurrier_city_name, lo.platform_order_code
             from dwh_redshift_logistic.v_clg_orders lo
             left join dwh_redshift_logistic.v_clg_countries lco on lo.rdbms_id = lco.rdbms_id
             left join dwh_redshift_logistic.v_clg_cities lc on lo.rdbms_id = lc.rdbms_id and lo.city_id = lc.city_id
             inner join construct_logistic cl on lo.rdbms_id = cl.rdbms_id and lo.entity_display_name = cl.entity_display_name and lo.order_placed_at::date = cl.report_date
             where lo.order_status = 'completed') l
         left join
-            (select
-                co.country_iso,
-                o.city_id as backend_city_id,
-                c.city_name_english as backend_city,
-                o.order_id,
-                o.source_id,
-                c.source_id
+            (select co.country_iso, o.city_id as backend_city_id, c.city_name_english as backend_city, o.order_id, o.source_id, c.source_id
             from dwh_il.ranked_fct_order o
             left join dwh_il.dim_countries co on o.source_id = co.source_id
             left join dwh_il.dim_city c on o.source_id = c.source_id and o.city_id = c.city_id
