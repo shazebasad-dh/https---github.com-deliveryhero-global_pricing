@@ -69,7 +69,7 @@ create temp table dates as (
         iso_date as report_date
     from dwh_il.dim_date
     where iso_date <= current_date
-    and iso_date >= dateadd('day',-90, current_date));
+    and iso_date >= dateadd('day',-107, current_date));
 
 insert into run_time (select '3. Temp table dates created' event, getdate() run_time);
 
@@ -80,7 +80,7 @@ create temp table construct_orders as (
         d.report_date
     from dwh_il.dim_countries as c
     cross join dates as d
-    where (c.management_entity_group like 'Hunger%') or (c.management_entity_group not like 'Hunger%' and d.report_date >= dateadd('day',-90, current_date)));
+    where (c.management_entity_group like 'Hunger%') or (c.management_entity_group not like 'Hunger%' and d.report_date >= dateadd('day',-107, current_date)));
 
 insert into run_time (select '4. Temp table construct_orders created' event, getdate() run_time);
 
@@ -205,7 +205,7 @@ create temp table construct_logistic as (
     from (select rdbms_id, entity_display_name, country_code from dwh_redshift_logistic.v_clg_orders group by 1,2,3) lo
     left join dwh_redshift_pd_il.dim_countries c on lo.rdbms_id = c.rdbms_id
     cross join dates as d
-    where (lo.entity_display_name like 'Hunger%') or (lo.entity_display_name not like 'Hunger%' and d.report_date >= dateadd('day',-100, current_date)));
+    where (lo.entity_display_name like 'Hunger%') or (lo.entity_display_name not like 'Hunger%' and d.report_date >= dateadd('day',-107, current_date)));
 
 insert into run_time (select '6. Temp table construct_logistic created' event, getdate() run_time);
 
@@ -483,6 +483,7 @@ insert into bi_global_pricing_dev.tableau_pricing_report (
     left join distinct_data dd on o.rdbms_id = dd.rdbms_id and o.entity_display_name = dd.entity_display_name and o.city_id = dd.city_id and o.zone_id = dd.zone_id and o.date = dd.order_date
     left join weekly_frequency w on o.rdbms_id = w.rdbms_id and o.entity_display_name = w.entity_display_name and o.city_id = w.city_id and o.zone_id = w.zone_id and o.date = w.iso_date
     left join active_restaurants r on o.source_id = r.source_id and o.city_id = r.city_id and o.date = r.date
-    left join dwh_il.dim_countries co on o.source_id = co.source_id);
+    left join dwh_il.dim_countries co on o.source_id = co.source_id
+    inner join (select dateadd('day',7, report_date) as date from dates) dt on o.date = dt.date);
 
 insert into run_time (select '17. Temp table into report inserted' event, getdate() run_time);
