@@ -229,7 +229,7 @@ create temp table log_orders as (
         lo.delivery_fee/100 as log_df_lc
     from dwh_redshift_logistic.v_clg_orders lo
     left join dwh_redshift_logistic.v_clg_vendors v using(rdbms_id, city_id, vendor_id)
-    inner join construct_logistic c on lo.entity_display_name = c.entity_display_name and lo.order_placed_at::date = c.report_date
+    inner join construct_logistic c on lo.entity_display_name = c.entity_display_name and lo.rdbms_id = c.rdbms_id and lo.order_placed_at::date = c.report_date
     where lo.order_status = 'completed');
 
 insert into run_time (select '7. Temp table log_orders created' event, getdate() run_time);
