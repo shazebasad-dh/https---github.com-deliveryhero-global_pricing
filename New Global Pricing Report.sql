@@ -438,3 +438,8 @@ insert into bi_global_pricing_dev.tableau_pricing_report (
     inner join (select dateadd('day',7, report_date) as date from construct_orders group by 1) dt on o.date = dt.date);
 
 insert into run_time (select '17. Temp table into report inserted' event, getdate() run_time);
+
+grant all on bi_global_pricing_dev.tableau_pricing_report to group bi_global_pricing;
+grant all on bi_global_pricing_dev.tableau_pricing_report to group bi_global;
+grant all on bi_global_pricing_dev.tableau_pricing_report to group bi_foodora;
+grant all on bi_global_pricing_dev.tableau_pricing_report to tableau_global;
