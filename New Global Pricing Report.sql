@@ -83,7 +83,6 @@ create temp table fct_orders as (
             else o.source_id
         end as source_id,
         o.restaurant_id,
-        r.city_id as backend_city_id,
         o.analytical_customer_id,
         o.order_date::date,
         case
@@ -124,7 +123,6 @@ create temp table fct_orders as (
         o.amt_voucher_other_eur
     from dwh_il.ranked_fct_order o
     left join dwh_il.fct_nps_ao nps on o.order_id = nps.order_id and o.source_id = nps.source_id
-    left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id
     inner join construct_orders c on o.order_date::date = c.report_date and o.source_id = c.source_id
     where not (o.is_cancelled or o.is_declined or o.is_failed));
 
@@ -175,7 +173,7 @@ create temp table od_orders as (
         lo.rdbms_id,
         lo.entity_display_name,
         --city--
-        o.backend_city_id,
+        r.city_id as backend_city_id,
         lo.city_id,
         --zone--
         lo.zone_id as zone_id,
@@ -216,7 +214,8 @@ create temp table od_orders as (
         o.amt_voucher_dh_eur,
         o.amt_voucher_other_eur
     from log_orders lo
-    inner join fct_orders o on lo.source_id = o.source_id and lo.platform_order_code = o.order_id);
+    inner join fct_orders o on lo.source_id = o.source_id and lo.platform_order_code = o.order_id
+    left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id);
 
 insert into run_time (select '8. Temp table od_orders created' event, getdate() run_time);
 
@@ -374,24 +373,59 @@ insert into run_time (select '15. Temp table active_restaurants created' event, 
 truncate table bi_global_pricing_dev.tableau_pricing_report;
 insert into bi_global_pricing_dev.tableau_pricing_report (
     select
-        co.management_entity_group as Management_Entity_Group,
-        co.company_name as Company_Name,
-        co.common_name as Country,
-        co.country_iso as Country_Iso,
-        co.currency_code as Currency,
-        co.region as Region,
-        o.*,
-        d.DrivingTimeBucket,
-        d.TotalDrivingTime,
-        d.TotalDrivingsWithTime,
-        d.Deliveries,
-        s.ActualWorkingTimeInSec,
-        dd.Distinct_Customers,
-        dd.Distinct_Restaurants,
-        w.Week_Valid_Customers,
-        w.Week_Valid_Orders,
-        r.number_of_od_restaurants as Number_of_OD_Restaurants,
-        r.number_of_restaurants as Number_of_Restaurants
+        co.management_entity_group,
+        co.company_name,
+        co.common_name as country,
+        co.country_iso,
+        co.currency_code as currency,
+        co.region,
+        o.entity_display_name,
+        o.source_id,
+        o.rdbms_id,
+        lc.name as city,
+        o.city_id,
+        z.name as zone,
+        o.zone_id,
+        o.date,
+        o.nps_scores,
+        o.nps_responses,
+        o.df_lc,
+        o.log_df_lc,
+        o.paid_lc,
+        o.cv_lc,
+        o.voucher_dh_lc,
+        o.voucher_other_lc,
+        o.discount_dh_lc,
+        o.discount_other_lc,
+        o.revenue_dh_lc,
+        o.commission_lc,
+        o.joker_lc,
+        o.delivery_fee_lc,
+        o.log_delivery_fee_lc,
+        o.df_eur,
+        o.paid_eur,
+        o.cv_eur,
+        o.voucher_dh_eur,
+        o.voucher_other_eur,
+        o.discount_dh_eur,
+        o.discount_other_eur,
+        o.revenue_dh_eur,
+        o.commission_eur,
+        o.joker_eur,
+        o.delivery_fee_eur,
+        o.newcustomers,
+        o.orders,
+        d.drivingtimebucket,
+        d.totaldrivingtime,
+        d.totaldrivingswithtime,
+        d.deliveries,
+        s.actualworkingtimeinsec,
+        dd.distinct_customers,
+        dd.distinct_restaurants,
+        w.week_valid_customers,
+        w.week_valid_orders,
+        r.number_of_od_restaurants,
+        r.number_of_restaurants
     from orders o
     left join deliveries d on o.rdbms_id = d.rdbms_id and o.entity_display_name = d.entity_display_name and o.city_id = d.city_id and o.zone_id = d.zone_id and o.date = d.delivery_date
     left join shifts s on o.rdbms_id = s.rdbms_id and o.city_id = s.city_id and o.zone_id = s.zone_id and o.date = s.shift_date
