@@ -56,3 +56,8 @@ create table bi_global_pricing_dev.pricing_mapping_source_rdbms_entity AS (
     left join dwh_il.dim_countries c using(dwh_country_id,dwh_company_id)
     where is_active
     order by entity_display_name);
+
+grant all on bi_global_pricing_dev.pricing_mapping_source_rdbms_entity to group bi_global_pricing;
+grant all on bi_global_pricing_dev.pricing_mapping_source_rdbms_entity to group bi_global;
+grant all on bi_global_pricing_dev.pricing_mapping_source_rdbms_entity to group bi_foodora;
+grant all on bi_global_pricing_dev.pricing_mapping_source_rdbms_entity to tableau_global;
