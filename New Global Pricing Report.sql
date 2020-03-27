@@ -363,7 +363,7 @@ create temp table active_restaurants as (
         count(distinct case when hist.is_online then hist.restaurant_id end) as number_of_restaurants
     from dwh_il.dim_restaurant_history hist
     join dwh_il.dim_restaurant as rest on rest.source_id = hist.source_id and rest.restaurant_id = hist.restaurant_id
-    join city_id_dictionary city on rest.city_id = city.backend_city_id and city.source_id and rest.source_id
+    join city_id_dictionary city on rest.city_id = city.backend_city_id and rest.source_id = city.source_id
     inner join construct_orders co on rest.source_id = co.source_id and hist.valid_at = co.report_date
     where rest.source_id > 0 and hist.is_online
     group by 1,2,3
@@ -399,8 +399,8 @@ insert into bi_global_pricing_dev.tableau_pricing_report (
     left join weekly_frequency w on o.rdbms_id = w.rdbms_id and o.entity_display_name = w.entity_display_name and o.city_id = w.city_id and o.zone_id = w.zone_id and o.date = w.iso_date
     left join active_restaurants r on o.source_id = r.source_id and o.city_id = r.city_id and o.date = r.date
     left join dwh_il.dim_countries co on o.source_id = co.source_id
-    left join dwh_redshift_logistic.v_clg_cities lc on o.rdbms_id = lc.rdbms_id and o.city_id = lc.city_id and lo.country_code = lc.country_code
-    left join dwh_redshift_logistic.v_clg_zones z on lo.rdbms_id = z.rdbms_id and lo.city_id = z.city_id and lo.zone_id = z.zone_id and lo.country_code = z.country_code
-    inner join (select dateadd('day',7, report_date) as date from dates) dt on o.date = dt.date);
+    left join dwh_redshift_logistic.v_clg_cities lc on o.rdbms_id = lc.rdbms_id and o.city_id = lc.city_id
+    left join dwh_redshift_logistic.v_clg_zones z on o.rdbms_id = z.rdbms_id and o.city_id = z.city_id and o.zone_id = z.zone_id
+    inner join (select dateadd('day',7, report_date) as date from construct_orders group by 1) dt on o.date = dt.date);
 
 insert into run_time (select '17. Temp table into report inserted' event, getdate() run_time);
