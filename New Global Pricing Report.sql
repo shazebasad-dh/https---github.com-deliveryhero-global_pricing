@@ -205,7 +205,7 @@ distkey(order_date) as
         o.amt_voucher_other_eur
     from log_orders lo
     inner join fct_orders o on lo.source_id = o.source_id and lo.platform_order_code = o.order_id
-    left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id;
+    left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id and o.source_id = r.source_id;
 
 drop table if exists orders;
 create temp table orders
