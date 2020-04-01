@@ -56,19 +56,9 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,number_of_restaurants          INTEGER
 );
 
-drop table if exists construct_orders;
-create temp table construct_orders
-distkey(report_date) as
-    select
-        c.source_id,
-        d.iso_date as report_date
-    from dwh_il.dim_countries as c
-    cross join dwh_il.dim_date as d
-    where c.is_active and d.iso_date between current_date - 187 and current_date;
-
 drop table if exists fct_orders;
 create temp table fct_orders
-distkey(order_date) as
+distkey(order_id) as
     select
         case o.source_id
             when 68 then 40 -- OnlinePizza to Foodora Sweden
@@ -115,24 +105,13 @@ distkey(order_date) as
         o.amt_voucher_dh_eur,
         o.amt_voucher_other_eur
     from dwh_il.ranked_fct_order o
+    left join dwh_il.dim_countries c on o.source_id and c.source_id
     left join dwh_il.fct_nps_ao nps on o.order_id = nps.order_id and o.source_id = nps.source_id
-    inner join construct_orders c on o.order_date::date = c.report_date and o.source_id = c.source_id
-    where not (o.is_cancelled or o.is_declined or o.is_failed);
-
-drop table if exists construct_logistic;
-create temp table construct_logistic
-distkey(report_date) as
-    select
-        d.iso_date as report_date,
-        lo.rdbms_id,
-        lo.entity_display_name
-    from (select rdbms_id, entity_display_name from dwh_redshift_logistic.v_clg_orders group by 1,2) lo
-    cross join dwh_il.dim_date as d
-    where d.iso_date between current_date - 187 and current_date;
+    where c.is_active and o.order_date between current_date - 187 and current_date and not (o.is_cancelled or o.is_declined or o.is_failed);
 
 drop table if exists log_orders;
 create temp table log_orders
-distkey(delivery_date) as
+distkey(order_id) as
     select
         --region, company--
         m.source_id,
@@ -152,11 +131,11 @@ distkey(delivery_date) as
     from dwh_redshift_logistic.v_clg_orders lo
     left join bi_global_pricing_dev.pricing_mapping_source_rdbms_entity m on m.rdbms_id = lo.rdbms_id and m.entity_display_name = lo.entity_display_name
     inner join construct_logistic c on lo.entity_display_name = c.entity_display_name and lo.rdbms_id = c.rdbms_id and lo.order_placed_at::date = c.report_date
-    where lo.order_status = 'completed';
+    where lo.order_status = 'completed' and lo.order_placed_at between current_date - 187 and current_date;
 
 drop table if exists od_orders;
 create temp table od_orders
-distkey(order_date) as
+distkey(order_id) as
     select
         --entity--
         o.source_id,
@@ -278,8 +257,7 @@ distkey(delivery_date) as
     group by 1,2,3,4,5,6;
 
 drop table if exists shifts;
-create temp table shifts
-distkey(shift_date) as
+create temp table shifts as
     select
         s.rdbms_id,
         s.city_id,
@@ -287,12 +265,11 @@ distkey(shift_date) as
         s.created_date as shift_date,
         sum(s.actual_working_time) as ActualWorkingTimeInSec
     from dwh_redshift_logistic.v_clg_shifts s
-    inner join (select rdbms_id, report_date from construct_logistic c group by 1,2) c on s.rdbms_id = c.rdbms_id and s.created_date = c.report_date
+    where s.created_date between current_date - 187 and current_date
     group by 1,2,3,4;
 
 drop table if exists distinct_data;
-create temp table distinct_data
-distkey(order_date) as
+create temp table distinct_data as
     select
         o.rdbms_id,
         o.entity_display_name,
@@ -306,7 +283,6 @@ distkey(order_date) as
 
 drop table if exists weekly_frequency;
 create temp table weekly_frequency
-distkey(iso_date) as
     select
         o.rdbms_id,
         o.entity_display_name,
@@ -317,7 +293,6 @@ distkey(iso_date) as
         sum(o.order_qty) as Week_Valid_Orders
     from dwh_il.dim_date d
     inner join od_orders o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
-    inner join construct_logistic c on o.rdbms_id = c.rdbms_id and o.entity_display_name = c.entity_display_name and d.iso_date = c.report_date
     group by 1,2,3,4,5;
 
 drop table if exists city_id_dictionary;
@@ -333,13 +308,11 @@ create temp table city_id_dictionary as
             row_number() over (partition by o.source_id, o.backend_city_id order by count desc) as rank,
             count(*)
             from od_orders o
-            group by 1,2,3
-        order by 1 asc, 3 asc, 5 desc)
+            group by 1,2,3)
     where rank = 1;
 
 drop table if exists active_restaurants;
 create temp table active_restaurants
-distkey("date") as
     select
         rest.source_id,
         city.hurrier_city_id as city_id,
@@ -349,10 +322,8 @@ distkey("date") as
     from dwh_il.dim_restaurant_history hist
     join dwh_il.dim_restaurant as rest on rest.source_id = hist.source_id and rest.restaurant_id = hist.restaurant_id
     join city_id_dictionary city on rest.city_id = city.backend_city_id and rest.source_id = city.source_id
-    inner join construct_orders co on rest.source_id = co.source_id and hist.valid_at = co.report_date
-    where rest.source_id > 0 and hist.is_online
-    group by 1,2,3
-    order by hist.valid_at;
+    where rest.source_id > 0 and hist.is_online and hist.valid_at between current_date - 187 and current_date
+    group by 1,2,3;
 
 truncate table bi_global_pricing_dev.tableau_pricing_report;
 insert into bi_global_pricing_dev.tableau_pricing_report
@@ -419,6 +390,6 @@ insert into bi_global_pricing_dev.tableau_pricing_report
     left join dwh_il.dim_countries co on o.source_id = co.source_id
     left join dwh_redshift_logistic.v_clg_cities lc on o.rdbms_id = lc.rdbms_id and o.city_id = lc.city_id
     left join dwh_redshift_logistic.v_clg_zones z on o.rdbms_id = z.rdbms_id and o.city_id = z.city_id and o.zone_id = z.zone_id
-    inner join (select dateadd('day',7, report_date) as date from construct_orders group by 1) dt on o.date = dt.date;
+    where o.date between current_date - 180 and current_date;
 
 analyze bi_global_pricing_dev.tableau_pricing_report predicate columns;
