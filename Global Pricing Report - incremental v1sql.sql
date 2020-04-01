@@ -1,76 +1,26 @@
-drop table bi_global_pricing_dev.tableau_pricing_report;
-create table bi_global_pricing_dev.tableau_pricing_report
-(
-  management_entity_group         VARCHAR(30)
-  ,company_name                   VARCHAR(30)
-  ,country                        VARCHAR(30)
-  ,country_iso                    VARCHAR(2)
-  ,currency                       VARCHAR(3)
-  ,region                         VARCHAR(10)
-  ,entity_display_name            VARCHAR(50)
-  ,source_id                      INTEGER
-  ,rdbms_id                       INTEGER
-  ,city                           VARCHAR(50)
-  ,city_id                        INTEGER
-  ,zone                           VARCHAR(50)
-  ,zone_id                        INTEGER
-  ,date                           DATE
-  ,nps_scores                     INTEGER
-  ,nps_responses                  INTEGER
-  ,df_lc                          NUMERIC(19,2)
-  ,log_df_lc                      NUMERIC(36,2)
-  ,paid_lc                        NUMERIC(36,2)
-  ,cv_lc                          NUMERIC(36,2)
-  ,voucher_dh_lc                  NUMERIC(36,2)
-  ,voucher_other_lc               NUMERIC(36,2)
-  ,discount_dh_lc                 NUMERIC(36,2)
-  ,discount_other_lc              NUMERIC(36,2)
-  ,revenue_dh_lc                  NUMERIC(36,2)
-  ,commission_lc                  NUMERIC(36,2)
-  ,joker_lc                       NUMERIC(36,2)
-  ,delivery_fee_lc                NUMERIC(36,2)
-  ,log_delivery_fee_lc            NUMERIC(36,2)
-  ,df_eur                         NUMERIC(12,2)
-  ,paid_eur                       NUMERIC(12,2)
-  ,cv_eur                         NUMERIC(12,2)
-  ,voucher_dh_eur                 NUMERIC(12,2)
-  ,voucher_other_eur              NUMERIC(12,2)
-  ,discount_dh_eur                NUMERIC(12,2)
-  ,discount_other_eur             NUMERIC(12,2)
-  ,revenue_dh_eur                 NUMERIC(12,2)
-  ,commission_eur                 NUMERIC(12,2)
-  ,joker_eur                      NUMERIC(12,2)
-  ,delivery_fee_eur               NUMERIC(12,2)
-  ,newcustomers                   INTEGER
-  ,orders                         INTEGER
-  ,drivingtimebucket              VARCHAR(5)
-  ,totaldrivingtime               INTEGER
-  ,totaldrivingswithtime          INTEGER
-  ,deliveries                     INTEGER
-  ,actualworkingtimeinsec         INTEGER
-  ,distinct_customers             INTEGER
-  ,distinct_restaurants           INTEGER
-  ,week_valid_customers           INTEGER
-  ,week_valid_orders              INTEGER
-  ,number_of_od_restaurants       INTEGER
-  ,number_of_restaurants          INTEGER
-);
+
+drop table if exists run_time;
+create temp table run_time as (select '1. Script started'::VARCHAR(50) event, getdate() run_time);
+
+drop table if exists pricing_report_before_40_days_ago;
+create temp table pricing_report_before_40_days_ago as (
+	select * from bi_global_pricing_dev.tableau_pricing_report where date < current_date - 40);
+
+insert into run_time (select '2. Report aux table created' event, getdate() run_time);
 
 drop table if exists construct_orders;
-create temp table construct_orders
-distkey(report_date)
-as
+create temp table construct_orders as (
     select
         c.source_id,
         d.iso_date as report_date
     from dwh_il.dim_countries as c
     cross join dwh_il.dim_date as d
-    where c.is_active and d.iso_date between current_date - 187 and current_date;
+    where c.is_active and d.iso_date between current_date - 47 and current_date);
+
+insert into run_time (select '3. Temp table construct_orders created' event, getdate() run_time);
 
 drop table if exists fct_orders;
-create temp table fct_orders
-distkey(order_date)
- as (
+create temp table fct_orders as (
     select
         case o.source_id
             when 68 then 40 -- OnlinePizza to Foodora Sweden
@@ -121,22 +71,22 @@ distkey(order_date)
     inner join construct_orders c on o.order_date::date = c.report_date and o.source_id = c.source_id
     where not (o.is_cancelled or o.is_declined or o.is_failed));
 
+insert into run_time (select '4. Temp table fct_orders created' event, getdate() run_time);
+
 drop table if exists construct_logistic;
-create temp table construct_logistic
-distkey(report_date)
- as (
+create temp table construct_logistic as (
     select
         d.iso_date as report_date,
         lo.rdbms_id,
         lo.entity_display_name
     from (select rdbms_id, entity_display_name from dwh_redshift_logistic.v_clg_orders group by 1,2) lo
     cross join dwh_il.dim_date as d
-    where d.iso_date between current_date - 187 and current_date);
+    where d.iso_date between current_date - 47 and current_date);
+
+insert into run_time (select '6. Temp table construct_logistic created' event, getdate() run_time);
 
 drop table if exists log_orders;
-create temp table log_orders
-distkey(delivery_date)
- as (
+create temp table log_orders as (
    select
         --region, company--
         m.source_id,
@@ -158,10 +108,10 @@ distkey(delivery_date)
     inner join construct_logistic c on lo.entity_display_name = c.entity_display_name and lo.rdbms_id = c.rdbms_id and lo.order_placed_at::date = c.report_date
     where lo.order_status = 'completed');
 
+insert into run_time (select '7. Temp table log_orders created' event, getdate() run_time);
+
 drop table if exists od_orders;
-create temp table od_orders
-distkey(order_date)
- as (
+create temp table od_orders as (
     select
         --entity--
         o.source_id,
@@ -212,10 +162,10 @@ distkey(order_date)
     inner join fct_orders o on lo.source_id = o.source_id and lo.platform_order_code = o.order_id
     left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id);
 
+insert into run_time (select '8. Temp table od_orders created' event, getdate() run_time);
+
 drop table if exists orders;
-create temp table orders
-distkey("Date")
- as (
+create temp table orders as (
     select
         o.source_id                                                  as Source_Id,
         o.rdbms_id                                                   as Rdbms_Id,
@@ -260,16 +210,12 @@ distkey("Date")
     from od_orders o
     group by 1,2,3,4,5,6,7,8,20);
 
+insert into run_time (select '9. Temp table orders created' event, getdate() run_time);
+
 drop table if exists deliveries;
-create temp table deliveries
-distkey(delivery_date)
-    as (
+create temp table deliveries as (
     select
-        de.rdbms_id,
-        de.entity_display_name,
-        de.city_id,
-        o.zone_id,
-        o.delivery_date,
+        de.rdbms_id, de.entity_display_name, de.city_id, o.zone_id, o.delivery_date,
         case
             when de.to_customer_time < 5*60.0 then '<05'
             when de.to_customer_time < 10*60.0 then '<10'
@@ -284,10 +230,10 @@ distkey(delivery_date)
     inner join od_orders o on de.rdbms_id = o.rdbms_id and de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id
     group by 1,2,3,4,5,6);
 
+insert into run_time (select '10. Temp table deliveries created' event, getdate() run_time);
+
 drop table if exists shifts;
-create temp table shifts
-distkey(shift_date)
- as (
+create temp table shifts as (
     select
         s.rdbms_id,
         s.city_id,
@@ -298,10 +244,10 @@ distkey(shift_date)
     inner join (select rdbms_id, report_date from construct_logistic c group by 1,2) c on s.rdbms_id = c.rdbms_id and s.created_date = c.report_date
     group by 1,2,3,4);
 
+insert into run_time (select '11. Temp table shifts created' event, getdate() run_time);
+
 drop table if exists distinct_data;
-create temp table distinct_data
-distkey(order_date)
- as (
+create temp table distinct_data as (
     select
         o.rdbms_id,
         o.entity_display_name,
@@ -313,10 +259,10 @@ distkey(order_date)
     from od_orders o
     group by 1,2,3,4,5);
 
+insert into run_time (select '12. Temp table distinct_data created' event, getdate() run_time);
+
 drop table if exists weekly_frequency;
-create temp table weekly_frequency
-distkey(iso_date)
- as (
+create temp table weekly_frequency as (
    select
         o.rdbms_id,
         o.entity_display_name,
@@ -329,6 +275,8 @@ distkey(iso_date)
     inner join od_orders o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
     inner join construct_logistic c on o.rdbms_id = c.rdbms_id and o.entity_display_name = c.entity_display_name and d.iso_date = c.report_date
     group by 1,2,3,4,5);
+
+insert into run_time (select '13. Temp table weekly_frequency created' event, getdate() run_time);
 
 drop table if exists city_id_dictionary;
 create temp table city_id_dictionary as (
@@ -347,10 +295,10 @@ create temp table city_id_dictionary as (
         order by 1 asc, 3 asc, 5 desc)
     where rank = 1);
 
+insert into run_time (select '14. Temp table city_dictionary created' event, getdate() run_time);
+
 drop table if exists active_restaurants;
-create temp table active_restaurants
-distkey("date")
- as (
+create temp table active_restaurants as (
     select
         rest.source_id,
         city.hurrier_city_id as city_id,
@@ -365,8 +313,14 @@ distkey("date")
     group by 1,2,3
     order by hist.valid_at);
 
+insert into run_time (select '15. Temp table active_restaurants created' event, getdate() run_time);
+
 truncate table bi_global_pricing_dev.tableau_pricing_report;
 insert into bi_global_pricing_dev.tableau_pricing_report (
+    select * from pricing_report_before_40_days_ago
+
+    union all
+    
     select
         co.management_entity_group,
         co.company_name,
@@ -432,4 +386,4 @@ insert into bi_global_pricing_dev.tableau_pricing_report (
     left join dwh_redshift_logistic.v_clg_zones z on o.rdbms_id = z.rdbms_id and o.city_id = z.city_id and o.zone_id = z.zone_id
     inner join (select dateadd('day',7, report_date) as date from construct_orders group by 1) dt on o.date = dt.date);
 
-analyze bi_global_pricing_dev.tableau_pricing_report predicate columns;
+insert into run_time (select '17. Temp table into report inserted' event, getdate() run_time);
