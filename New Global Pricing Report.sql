@@ -105,7 +105,7 @@ distkey(order_id) as
 
 drop table if exists log_orders;
 create temp table log_orders
-distkey(order_id) as
+distkey(log_order_id) as
     select
         --region, company--
         m.source_id,
@@ -124,7 +124,6 @@ distkey(order_id) as
         lo.delivery_fee/100 as log_df_lc
     from dwh_redshift_logistic.v_clg_orders lo
     left join bi_global_pricing_dev.pricing_mapping_source_rdbms_entity m on m.rdbms_id = lo.rdbms_id and m.entity_display_name = lo.entity_display_name
-    inner join construct_logistic c on lo.entity_display_name = c.entity_display_name and lo.rdbms_id = c.rdbms_id and lo.order_placed_at::date = c.report_date
     where lo.order_status = 'completed' and lo.order_placed_at between current_date - 187 and current_date;
 
 drop table if exists od_orders;
@@ -270,7 +269,7 @@ create temp table distinct_data as
     group by 1,2,3,4,5;
 
 drop table if exists weekly_frequency;
-create temp table weekly_frequency
+create temp table weekly_frequency as
     select
         o.rdbms_id,
         o.entity_display_name,
@@ -300,9 +299,13 @@ create temp table city_id_dictionary as
     where rank = 1;
 
 drop table if exists active_restaurants;
-create temp table active_restaurants
+create temp table active_restaurants as
     select
-        rest.source_id,
+        case rest.source_id
+            when 68 then 40 -- OnlinePizza to Foodora Sweden
+            when 18 then 129 -- PedidosYa Panama to Appetito24, but order id does not seem to be matching for those ~600 orders
+            else rest.source_id
+        end as source_id,
         city.hurrier_city_id as city_id,
         hist.valid_at as date,
         count(distinct case when hist.is_online and hist.is_dh_delivery then hist.restaurant_id end) as number_of_od_restaurants,
