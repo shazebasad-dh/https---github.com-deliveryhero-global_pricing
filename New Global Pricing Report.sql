@@ -15,8 +15,6 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,zone                           VARCHAR(50)
   ,zone_id                        INTEGER
   ,date                           DATE
-  ,nps_scores                     INTEGER
-  ,nps_responses                  INTEGER
   ,df_lc                          NUMERIC(19,2)
   ,log_df_lc                      NUMERIC(36,2)
   ,paid_lc                        NUMERIC(36,2)
@@ -80,8 +78,6 @@ distkey(order_id) as
         end order_id,
         o.is_acquisition,
         o.order_qty,
-        --nps--
-        nps.nps,
         --rev in lc--
         o.amt_paid_lc,
         o.amt_cv_lc,
@@ -105,9 +101,7 @@ distkey(order_id) as
         o.amt_voucher_dh_eur,
         o.amt_voucher_other_eur
     from dwh_il.ranked_fct_order o
-    left join dwh_il.dim_countries c on o.source_id and c.source_id
-    left join dwh_il.fct_nps_ao nps on o.order_id = nps.order_id and o.source_id = nps.source_id
-    where c.is_active and o.order_date between current_date - 187 and current_date and not (o.is_cancelled or o.is_declined or o.is_failed);
+    where o.order_date between current_date - 187 and current_date and not (o.is_cancelled or o.is_declined or o.is_failed);
 
 drop table if exists log_orders;
 create temp table log_orders
@@ -156,8 +150,6 @@ distkey(order_id) as
         lo.delivery_date,
         o.is_acquisition,
         o.order_qty,
-        --nps--
-        o.nps,
         --hurrier df--
         lo.log_df_lc,
         --rev in lc--
@@ -225,11 +217,7 @@ distkey("Date") as
         sum(o.amt_delivery_fee_eur)                                  as Delivery_Fee_EUR,
         -- Volume --
         sum(case when o.is_acquisition then o.order_qty else 0 end)  as NewCustomers, -- Number of first *successful* orders // first_order_all considers the first order regardless of its final status
-        sum(o.order_qty)                                             as Orders,
-        -- NPS --
-        sum(case when o.nps >= 9 then 1.0
-            when o.nps <= 6 then -1.0 else 0 end)                    as NPS_Scores,
-        sum(case when o.nps is not null then 1 end)                  as NPS_Responses
+        sum(o.order_qty)                                             as Orders
     from od_orders o
     group by 1,2,3,4,5,6,7,8,20;
 
@@ -342,8 +330,6 @@ insert into bi_global_pricing_dev.tableau_pricing_report
         z.name as zone,
         o.zone_id,
         o.date,
-        o.nps_scores,
-        o.nps_responses,
         o.df_lc,
         o.log_df_lc,
         o.paid_lc,
@@ -390,6 +376,6 @@ insert into bi_global_pricing_dev.tableau_pricing_report
     left join dwh_il.dim_countries co on o.source_id = co.source_id
     left join dwh_redshift_logistic.v_clg_cities lc on o.rdbms_id = lc.rdbms_id and o.city_id = lc.city_id
     left join dwh_redshift_logistic.v_clg_zones z on o.rdbms_id = z.rdbms_id and o.city_id = z.city_id and o.zone_id = z.zone_id
-    where o.date between current_date - 180 and current_date;
+    where co.is_active and o.date between current_date - 180 and current_date;
 
 analyze bi_global_pricing_dev.tableau_pricing_report predicate columns;
