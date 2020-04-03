@@ -44,6 +44,7 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,drivingtimebucket              VARCHAR(5)
   ,totaldrivingtime               INTEGER
   ,totaldrivingswithtime          INTEGER
+  ,totaldrivingdistance           INTEGER
   ,deliveries                     INTEGER
   ,actualworkingtimeinsec         INTEGER
   ,distinct_customers             INTEGER
@@ -238,6 +239,7 @@ distkey(delivery_date) as
             else 'N/A' end                                           as DrivingTimeBucket,
         sum(de.to_customer_time)                                     as TotalDrivingTime,
         sum(case when de.to_customer_time is not null then 1 end)    as TotalDrivingsWithTime,
+        sum(de.dropoff_distance_manhattan)                           as TotalDrivingDistance,
         count(*)                                                     as Deliveries
     from dwh_redshift_logistic.v_clg_deliveries de
     inner join od_orders o on de.rdbms_id = o.rdbms_id and de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id
@@ -362,6 +364,7 @@ insert into bi_global_pricing_dev.tableau_pricing_report
         d.drivingtimebucket,
         d.totaldrivingtime,
         d.totaldrivingswithtime,
+        d.totaldrivingdistance,
         d.deliveries,
         s.actualworkingtimeinsec,
         dd.distinct_customers,
