@@ -8,12 +8,12 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,currency                       VARCHAR(3)
   ,region                         VARCHAR(10)
   ,entity_display_name            VARCHAR(50)
-  ,source_id                      INTEGER
-  ,rdbms_id                       INTEGER
+  ,source_id                      SMALLINT
+  ,rdbms_id                       SMALLINT
   ,city                           VARCHAR(50)
-  ,city_id                        INTEGER
+  ,city_id                        SMALLINT
   ,zone                           VARCHAR(50)
-  ,zone_id                        INTEGER
+  ,zone_id                        SMALLINT
   ,date                           DATE
   ,df_lc                          NUMERIC(19,2)
   ,log_df_lc                      NUMERIC(36,2)
@@ -45,6 +45,7 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,totaldrivingtime               INTEGER
   ,totaldrivingswithtime          INTEGER
   ,totaldrivingdistance           INTEGER
+  ,totaldrivingswithdistance      INTEGER
   ,deliveries                     INTEGER
   ,actualworkingtimeinsec         INTEGER
   ,distinct_customers             INTEGER
@@ -55,58 +56,34 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,number_of_restaurants          INTEGER
 );
 
-drop table if exists fct_orders;
-create temp table fct_orders
-distkey(order_id) as
+drop table if exists source_id_mapping;
+create temp table source_id_mapping
+diststyle all as
     select
-        case o.source_id
-            when 68 then 40 -- OnlinePizza to Foodora Sweden
-            when 18 then 129 -- PedidosYa Panama to Appetito24, but order id does not seem to be matching for those ~600 orders
-            else o.source_id
-        end as source_id,
-        o.restaurant_id,
-        o.analytical_customer_id,
-        o.order_date::date,
-        case
-            when o.source_id in (39, 97, 143, 32) then o.order_number -- 39: Austria; 97: Hungary; 143: Sweden; 32: Turkey --> entities that only order_number can be used to join with platform_order_code
-            when o.source_id = 119 then 'CG-1-' + o.order_id -- Kuwait
-            when o.source_id = 120 then 'CG-2-' + o.order_id -- Bahrain
-            when o.source_id = 121 then 'CG-3-' + o.order_id -- CG United Arab Emirates
-            when o.source_id = 122 then 'CG-4-' + o.order_id -- Qatar
-            when o.source_id = 124 then 'CG-5-' + o.order_id -- Saudi Arabia
-            when o.source_id = 142 then 'zo-' + o.order_id -- Zomato United Arab Emirates
-            else o.order_id
-        end order_id,
-        o.is_acquisition,
-        o.order_qty,
-        --rev in lc--
-        o.amt_paid_lc,
-        o.amt_cv_lc,
-        o.amt_commission_lc,
-        o.amt_joker_lc,
-        o.amt_delivery_fee_lc,
-        o.amt_dh_revenue_lc,
-        o.amt_discount_dh_lc,
-        o.amt_discount_other_lc,
-        o.amt_voucher_dh_lc,
-        o.amt_voucher_other_lc,
-        --rev in lc--
-        o.amt_paid_eur,
-        o.amt_cv_eur,
-        o.amt_commission_eur,
-        o.amt_joker_eur,
-        o.amt_delivery_fee_eur,
-        o.amt_dh_revenue_eur,
-        o.amt_discount_dh_eur,
-        o.amt_discount_other_eur,
-        o.amt_voucher_dh_eur,
-        o.amt_voucher_other_eur
-    from dwh_il.ranked_fct_order o
-    where o.order_date between current_date - 187 and current_date and not (o.is_cancelled or o.is_declined or o.is_failed);
+        dc.source_id,
+        case dc.source_id
+            when 68 then 40 -- onlinepizza to foodora sweden
+            when 18 then 129 -- pedidosya panama to appetito24, but order id does not seem to be matching for those ~600 orders
+            else source_id
+        end as new_source_id
+    from dwh_il.dim_countries dc
+    where dc.is_active;
+
+drop table if exists order_id_number;
+create temp table order_id_number -- we don't want to recreate ranked_fct_order so we will just align logistics data to it / redshift is columnar it is ok to scan ranked_fct_order for 3 columns
+distkey(order_number) as
+    select
+        rfo.source_id,
+        rfo.order_id,
+        rfo.order_number
+    from dwh_il.ranked_fct_order rfo
+    where rfo.source_id in (39, 97, 143, 32)
+        and rfo.order_date between current_date - 187 and current_date
+        and rfo.is_dh_delivery; --> shoud cover logistic data -- if nto ticket to be raised for dwh
 
 drop table if exists log_orders;
 create temp table log_orders
-distkey(log_order_id) as
+distkey(platform_order_code) as
     select
         --region, company--
         m.source_id,
@@ -119,17 +96,23 @@ distkey(log_order_id) as
         lo.city_id,
         coalesce(lo.zone_id,0) as zone_id, -- Adjustment to the orders with no zone assigned
         --orders data--
-        lo.platform_order_code,
+        case when lo.platform_order_code like 'CG-%'  -- Carriage only had one backend; order_id is unique
+                then split_part(lo.platform_order_code, '-', 3)
+             when platform_order_code like 'zo-%' -- We only have one country in Zomato (UAE); order_id is also unique
+                then split_part(lo.platform_order_code, '-', 2)
+             else coalesce(o.order_id, lo.platform_order_code)
+        end as platform_order_code,
         lo.order_id as log_order_id,
         lo.order_placed_at::date as delivery_date,
         lo.delivery_fee/100 as log_df_lc
     from dwh_redshift_logistic.v_clg_orders lo
     left join bi_global_pricing_dev.pricing_mapping_source_rdbms_entity m on m.rdbms_id = lo.rdbms_id and m.entity_display_name = lo.entity_display_name
+    left join order_id_number o on m.source_id = o.source_id and lo.platform_order_code = o.order_number
     where lo.order_status = 'completed' and lo.order_placed_at between current_date - 187 and current_date;
 
 drop table if exists od_orders;
-create temp table od_orders
-distkey(order_id) as
+create temp table od_orders --> usually we don't materialize this but it is used 5 times so for simplicity and preparing diskey we do
+distkey(log_order_id) as --> there is no distkey that seems to win over another one (ie : group bys are done on different dimension on low cardinality values) so we go for optimizing the join with deliveries
     select
         --entity--
         o.source_id,
@@ -174,9 +157,12 @@ distkey(order_id) as
         o.amt_discount_other_eur,
         o.amt_voucher_dh_eur,
         o.amt_voucher_other_eur
-    from log_orders lo
-    inner join fct_orders o on lo.source_id = o.source_id and lo.platform_order_code = o.order_id
-    left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id and o.source_id = r.source_id;
+    from dwh_il.ranked_fct_order o
+    join source_id_mapping sim ON o.source_id = sim.source_id
+    join log_orders lo on lo.source_id = o.source_id and lo.platform_order_code = o.order_id
+    left join dwh_il.dim_restaurant r on o.restaurant_id = r.restaurant_id and o.source_id = r.source_id
+    where o.order_date between current_date - 187 and current_date
+        and o.is_dh_delivery; --> that should cover logitistic data, if not tickets need to be raised to fix the flag
 
 drop table if exists orders;
 create temp table orders
@@ -240,6 +226,16 @@ distkey(delivery_date) as
         sum(de.to_customer_time)                                     as TotalDrivingTime,
         sum(case when de.to_customer_time is not null then 1 end)    as TotalDrivingsWithTime,
         sum(de.dropoff_distance_manhattan)                           as TotalDrivingDistance,
+        /*sum(case when de.pickup <> de.dropoff then
+            st_distancesphere(st_geomfromtext(de.pickup),
+                st_makepoint(
+                    st_x(st_geomfromtext(de.pickup)),
+                    st_y(st_geomfromtext(de.dropoff))))
+            + st_distancesphere(st_geomfromtext(de.dropoff),
+                st_makepoint(
+                    st_x(st_geomfromtext(de.pickup)),
+                    st_y(st_geomfromtext(de.dropoff)))) end)         as TotalDrivingDistance,*/
+        sum(case when de.pickup <> de.dropoff then 1 end)            as TotalDrivingsWithDistance,
         count(*)                                                     as Deliveries
     from dwh_redshift_logistic.v_clg_deliveries de
     inner join od_orders o on de.rdbms_id = o.rdbms_id and de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id
@@ -280,8 +276,10 @@ create temp table weekly_frequency as
         d.iso_date,
         count(distinct o.analytical_customer_id) as Week_Valid_Customers,
         sum(o.order_qty) as Week_Valid_Orders
-    from dwh_il.dim_date d
-    inner join od_orders o on o.order_date > d.iso_date - 7 and o.order_date <= d.iso_date
+    from od_orders o
+    inner join dwh_il.dim_date d on o.order_date > d.iso_date - 7
+        and o.order_date <= d.iso_date
+        and d.iso_date between current_date - 187 and current_date + 7
     group by 1,2,3,4,5;
 
 drop table if exists city_id_dictionary;
@@ -365,6 +363,7 @@ insert into bi_global_pricing_dev.tableau_pricing_report
         d.totaldrivingtime,
         d.totaldrivingswithtime,
         d.totaldrivingdistance,
+        d.totaldrivingswithdistance,
         d.deliveries,
         s.actualworkingtimeinsec,
         dd.distinct_customers,
