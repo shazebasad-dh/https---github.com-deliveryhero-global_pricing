@@ -4,7 +4,7 @@ create table bi_global_pricing_dev.tableau_pricing_report
   management_entity_group         VARCHAR(30)
   ,company_name                   VARCHAR(30)
   ,country                        VARCHAR(30)
-  ,country_iso                    VARCHAR(2)
+  ,country_iso                    VARCHAR(4)
   ,currency                       VARCHAR(3)
   ,region                         VARCHAR(10)
   ,entity_display_name            VARCHAR(50)
@@ -54,7 +54,9 @@ create table bi_global_pricing_dev.tableau_pricing_report
   ,week_valid_orders              INTEGER
   ,number_of_od_restaurants       INTEGER
   ,number_of_restaurants          INTEGER
-);
+)
+DISTSTYLE EVEN
+;
 
 drop table if exists source_id_mapping;
 create temp table source_id_mapping
@@ -79,7 +81,7 @@ distkey(order_number) as
     from dwh_il.ranked_fct_order rfo
     where rfo.source_id in (39, 97, 143, 32)
         and rfo.order_date between current_date - 187 and current_date
-        and rfo.is_dh_delivery; --> shoud cover logistic data -- if nto ticket to be raised for dwh
+        and rfo.is_dh_delivery; --> shoud cover logistic data -- if not ticket to be raised for dwh
 
 drop table if exists log_orders;
 create temp table log_orders
@@ -173,7 +175,7 @@ distkey("Date") as
         o.entity_display_name                                        as Entity_Display_Name,
         o.city_id                                                    as City_Id,
         o.zone_id                                                    as Zone_Id,
-        o.order_date                                                 as Date,
+        o.order_date::date                                                 as Date,
         -- Delivery fee from Hurrier --
         o.log_df_lc                                                  as Log_DF_LC,
         -- Revenue in LC --
@@ -221,7 +223,7 @@ distkey(delivery_date) as
             when de.to_customer_time < 10*60.0 then '<10'
             when de.to_customer_time < 15*60.0 then '<15'
             when de.to_customer_time < 20*60.0 then '<20'
-            when de.to_customer_time >= 20*60.0 then '⩾20'
+            when de.to_customer_time >= 20*60.0 then '>=20'
             else 'N/A' end                                           as DrivingTimeBucket,
         sum(de.to_customer_time)                                     as TotalDrivingTime,
         sum(case when de.to_customer_time is not null then 1 end)    as TotalDrivingsWithTime,
@@ -242,7 +244,9 @@ distkey(delivery_date) as
     group by 1,2,3,4,5,6;
 
 drop table if exists shifts;
-create temp table shifts as
+create temp table shifts
+distkey(shift_date)
+as
     select
         s.rdbms_id,
         s.city_id,
@@ -254,7 +258,9 @@ create temp table shifts as
     group by 1,2,3,4;
 
 drop table if exists distinct_data;
-create temp table distinct_data as
+create temp table distinct_data
+distkey(order_date)
+as
     select
         o.rdbms_id,
         o.entity_display_name,
@@ -267,7 +273,9 @@ create temp table distinct_data as
     group by 1,2,3,4,5;
 
 drop table if exists weekly_frequency;
-create temp table weekly_frequency as
+create temp table weekly_frequency
+distkey(iso_date)
+as
     select
         o.rdbms_id,
         o.entity_display_name,
@@ -283,7 +291,9 @@ create temp table weekly_frequency as
     group by 1,2,3,4,5;
 
 drop table if exists city_id_dictionary;
-create temp table city_id_dictionary as
+create temp table city_id_dictionary
+diststyle all
+as
     select
         source_id,
         backend_city_id,
@@ -299,7 +309,9 @@ create temp table city_id_dictionary as
     where rank = 1;
 
 drop table if exists active_restaurants;
-create temp table active_restaurants as
+create temp table active_restaurants
+distkey("date")
+as
     select
         case rest.source_id
             when 68 then 40 -- OnlinePizza to Foodora Sweden
