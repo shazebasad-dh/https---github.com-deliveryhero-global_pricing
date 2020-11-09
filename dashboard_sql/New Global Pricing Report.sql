@@ -1,5 +1,4 @@
-drop table bi_global_pricing_dev.tableau_pricing_report;
-create table bi_global_pricing_dev.tableau_pricing_report
+create table dwh_bl.tableau_pricing_report
 (
   management_entity_group         VARCHAR(30)
   ,company_name                   VARCHAR(30)
@@ -81,9 +80,9 @@ distkey(order_number) as
     from dwh_il.ranked_fct_order rfo
     where rfo.source_id in (39, 97, 143, 32)
         and rfo.order_date between current_date - 187 and current_date
-        and rfo.is_dh_delivery; --> shoud cover logistic data -- if not ticket to be raised for dwh
+        and rfo.is_dh_delivery; --> shoud cover logistic data -- if nto ticket to be raised for dwh
 
-drop table if exists log_orders;
+--drop table if exists log_orders;
 create temp table log_orders
 distkey(platform_order_code) as
     select
@@ -112,7 +111,7 @@ distkey(platform_order_code) as
     left join order_id_number o on m.source_id = o.source_id and lo.platform_order_code = o.order_number
     where lo.order_status = 'completed' and lo.order_placed_at between current_date - 187 and current_date;
 
-drop table if exists od_orders;
+--drop table if exists od_orders;
 create temp table od_orders --> usually we don't materialize this but it is used 5 times so for simplicity and preparing diskey we do
 distkey(log_order_id) as --> there is no distkey that seems to win over another one (ie : group bys are done on different dimension on low cardinality values) so we go for optimizing the join with deliveries
     select
@@ -131,7 +130,7 @@ distkey(log_order_id) as --> there is no distkey that seems to win over another 
         o.order_id,
         o.restaurant_id,
         o.analytical_customer_id,
-        o.order_date,
+        o.order_date::date as order_date,
         lo.delivery_date,
         o.is_acquisition,
         o.order_qty,
@@ -166,7 +165,7 @@ distkey(log_order_id) as --> there is no distkey that seems to win over another 
     where o.order_date between current_date - 187 and current_date
         and o.is_dh_delivery; --> that should cover logitistic data, if not tickets need to be raised to fix the flag
 
-drop table if exists orders;
+--drop table if exists orders;
 create temp table orders
 distkey("Date") as
     select
@@ -175,7 +174,7 @@ distkey("Date") as
         o.entity_display_name                                        as Entity_Display_Name,
         o.city_id                                                    as City_Id,
         o.zone_id                                                    as Zone_Id,
-        o.order_date::date                                                 as Date,
+        o.order_date                                                 as Date,
         -- Delivery fee from Hurrier --
         o.log_df_lc                                                  as Log_DF_LC,
         -- Revenue in LC --
@@ -209,7 +208,7 @@ distkey("Date") as
     from od_orders o
     group by 1,2,3,4,5,6,7,8,20;
 
-drop table if exists deliveries;
+--drop table if exists deliveries;
 create temp table deliveries
 distkey(delivery_date) as
     select
@@ -243,7 +242,7 @@ distkey(delivery_date) as
     inner join od_orders o on de.rdbms_id = o.rdbms_id and de.entity_display_name = o.entity_display_name and de.order_id = o.log_order_id
     group by 1,2,3,4,5,6;
 
-drop table if exists shifts;
+--drop table if exists shifts;
 create temp table shifts
 distkey(shift_date)
 as
@@ -257,7 +256,7 @@ as
     where s.created_date between current_date - 187 and current_date
     group by 1,2,3,4;
 
-drop table if exists distinct_data;
+--drop table if exists distinct_data;
 create temp table distinct_data
 distkey(order_date)
 as
@@ -328,8 +327,8 @@ as
     where rest.source_id > 0 and hist.is_online and hist.valid_at between current_date - 187 and current_date
     group by 1,2,3;
 
-truncate table bi_global_pricing_dev.tableau_pricing_report;
-insert into bi_global_pricing_dev.tableau_pricing_report
+truncate table dwh_bl.tableau_pricing_report;
+insert into dwh_bl.tableau_pricing_report
     select
         co.management_entity_group,
         co.company_name,
@@ -395,4 +394,4 @@ insert into bi_global_pricing_dev.tableau_pricing_report
     left join dwh_redshift_logistic.v_clg_zones z on o.rdbms_id = z.rdbms_id and o.city_id = z.city_id and o.zone_id = z.zone_id
     where co.is_active and o.date between current_date - 180 and current_date;
 
-analyze bi_global_pricing_dev.tableau_pricing_report predicate columns;
+analyze dwh_bl.tableau_pricing_report predicate columns;
