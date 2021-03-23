@@ -1,9 +1,6 @@
 # SQL script collection
 
 
-
-# Aspect
-
 ## General
 * city_zone
 
