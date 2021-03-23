@@ -8,10 +8,10 @@
 select
   entity_id,
   country_code,
-  created_date,
   order_id,
   sum(delivery_costs)
 from fulfillment-dwh-production.cl.utr_timings
+group by 1,2,3
 
 -- Laurent's approach
 select
