@@ -1,7 +1,7 @@
 -- Date:            2021/03/23
 -- Contributor:     Yuzhu Zhang
 -- Enviroment:      Bigquery
--- BI consultant:   Xun, Trupti
+-- BI consultant:   Xun, Trupti, Fabian
 -- Comment:    
 
 -- Xun's approach
