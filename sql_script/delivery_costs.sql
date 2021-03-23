@@ -4,7 +4,7 @@
 -- BI consultant:   Xun, Trupti, Fabian
 -- Comment:    
 
--- Xun's approach
+-- Xun's approach (confirmed by Trupti and Fabian)
 select
   entity_id,
   country_code,
