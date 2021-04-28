@@ -15,8 +15,7 @@ The price points analysis is used to see what delivery fee a user from a geopoin
 The script is an analysis done using DAS data before DPS time and adjusted to needs of different countries, therefore you see different versions of the script. It could be also be used for "spreading the butter" project.
 
 ## Other
-* Commission comparison
-There are different source of commission data in pandata and central data warehouse. Yuzhu compared two different sources and found out that the differences are not so big except for certain countries. So data science team could use central data warehouse commission data for their models
+Commission comparison: There are different source of commission data in pandata and central data warehouse. Yuzhu compared two different sources and found out that the differences are not so big except for certain countries. So data science team could use central data warehouse commission data for their models
 
 
 
