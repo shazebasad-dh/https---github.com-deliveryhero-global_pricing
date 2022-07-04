@@ -1,4 +1,22 @@
-create table pricing.growth_report_monthy_orders_kpis as (
+-- drop table pricing.growth_report_monthy_orders_kpis
+create or replace table pricing.growth_report_monthy_orders_kpis 
+partition by month
+options(
+  partition_expiration_days=null,
+  require_partition_filter=false
+)
+as 
+-- (
+-- select * from `dh-logistics-product-ops.pricing.growth_report_monthy_orders_kpis`
+-- where
+--   month < date_sub(date_trunc(current_date(), month), interval 1 month)
+-- union all
+-- select * 
+-- from `dh-logistics-product-ops.pricing.growth_report_monthy_orders_kpis_view`
+-- where
+--   month >= date_sub(date_trunc(current_date(), month), interval 1 month)
+-- )
+(
 with
 entities as (
     select distinct global_entity_id
@@ -63,11 +81,6 @@ left join `fulfillment-dwh-production.curated_data_shared_central_dwh.vendors` v
 -- left join order_service_fee using (global_entity_id, order_id)
 left join `dh-logistics-product-ops.pricing.delivery_costs_per_order` c using (global_entity_id, order_id)
 where o.is_sent
-    and date(o.placed_at_local) between '2018-01-01' and current_date()
+    and date(o.placed_at_local) between '2015-01-01' and current_date()
 group by 1,2,3,4,5,6
-)
-partition by month
-options(
-  partition_expiration_days=null,
-  require_partition_filter=false
 )
