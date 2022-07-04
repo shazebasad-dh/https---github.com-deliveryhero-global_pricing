@@ -1,4 +1,4 @@
--- create table pricing.growth_report_monthy_orders_kpis as (
+create table pricing.growth_report_monthy_orders_kpis as (
 with
 entities as (
     select distinct global_entity_id
@@ -65,4 +65,9 @@ left join `dh-logistics-product-ops.pricing.delivery_costs_per_order` c using (g
 where o.is_sent
     and date(o.placed_at_local) between '2018-01-01' and current_date()
 group by 1,2,3,4,5,6
--- )
+)
+partition by month
+options(
+  partition_expiration_days=null,
+  require_partition_filter=false
+)
