@@ -2,7 +2,7 @@ create or replace table `dh-logistics-product-ops.pricing.order_service_fee`
 partition by created_date
 options(
   partition_expiration_days = null,
-  require_partition_filter = true
+  require_partition_filter = false
 )
 as 
 with
