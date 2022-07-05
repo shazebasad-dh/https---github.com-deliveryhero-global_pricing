@@ -3,7 +3,7 @@ create or replace table `dh-logistics-product-ops.pricing.growth_report_monthy_o
 partition by month
 options(
   partition_expiration_days = null,
-  require_partition_filter = true
+  require_partition_filter = false
 )
 as 
 -- (
