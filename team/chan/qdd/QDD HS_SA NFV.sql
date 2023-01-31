@@ -1,28 +1,57 @@
-
---Variable setting
+ --Variable setting
 DECLARE CtryCode STRING;
 DECLARE DateIndicator DATE;
 DECLARE vertical STRING;
+
+
+-- Wave inputs
+DECLARE test_arrays ARRAY<STRING>;
+DECLARE AllTestVar STRING DEFAULT "All Other cities";
+DECLARE WaveStart DATE DEFAULT "2023-01-24";
+DECLARE riyadh_test DEFAULT "SA_20230124_A_B0_O_Riyadh Other vertical";
+DECLARE WaveShare FLOAT64 DEFAULT 0.33;
+DECLARE WaveEnd DATE DEFAULT NULL;
+
+
+
+
  
 --Definite Inputs
 SET CtryCode = 'sa';
-SET DateIndicator = '2022-01-01';
-SET vertical = "shops";
+SET DateIndicator = '2023-01-01';
+SET test_arrays = [ "SA_20230124_A_B0_O_Riyadh Other vertical"
+  , "SA_20230124_A_B0_O_EP Other vertical"
+  , "SA_20230124_A_B0_O_Jeddah Other vertical"
+  , "SA_20230124_A_B0_O_Madina Other vertical"
+  , "SA_20230124_A_B0_O_Jazan Other vertical"
+  , "SA_20230124_A_B0_O_Hafar Al Batin Other vertical"
+  , "SA_20230124_A_B0_O_Yanbu Other vertical"
+  , "SA_20230124_A_B0_O_Abha Other vertical"
+  , "SA_20230124_A_B0_O_Alkharj Other vertical"
+  , "SA_20230124_A_B0_O_Jubail Other vertical"
+  , "SA_20230124_A_B0_O_Hail Other vertical"
+  , "SA_20230124_A_B0_O_Ahsa Other vertical"
+  , "SA_20230124_A_B0_O_Tabuk Other vertical"
+  , "SA_20230124_A_B0_O_QP Other vertical"
+  , "SA_20230124_A_B0_O_Mecca Other vertical"
+  , "SA_20230124_A_B0_O_Taif Other vertical"
+];
 
-    CREATE OR REPLACE EXTERNAL TABLE `dh-logistics-product-ops.pricing._sa_rdf_vendors`
-        (
-        year STRING,
-        month FLOAT64,
-        offer_type STRING,
-        restaurant_max_charge FLOAT64,
-        delivery_fee FLOAT64
-        )
-        OPTIONS (
-        format="GOOGLE_SHEETS",
-        uris=["https://docs.google.com/spreadsheets/d/1-u6bmK6NpeRZyPEGmu4NKCj-ia0S1AWWvDciJG_wtdQ/edit#gid=1359779822"],
-        sheet_range="data!A1:E7",
-        skip_leading_rows=1
-    );
+
+    -- CREATE OR REPLACE EXTERNAL TABLE `dh-logistics-product-ops.pricing._sa_rdf_vendors`
+    --     (
+    --     year STRING,
+    --     month FLOAT64,
+    --     offer_type STRING,
+    --     restaurant_max_charge FLOAT64,
+    --     delivery_fee FLOAT64
+    --     )
+    --     OPTIONS (
+    --     format="GOOGLE_SHEETS",
+    --     uris=["https://docs.google.com/spreadsheets/d/1-u6bmK6NpeRZyPEGmu4NKCj-ia0S1AWWvDciJG_wtdQ/edit#gid=1359779822"],
+    --     sheet_range="data!A1:E7",
+    --     skip_leading_rows=1
+    -- );
 
 
     CREATE OR REPLACE TEMP TABLE pre_staging_orders AS  
@@ -64,7 +93,6 @@ SET vertical = "shops";
         from `dh-logistics-product-ops.pricing._sa_rdf_vendors`
 
     )
-
 
     , load_dps_sessions as (
         select
@@ -139,7 +167,10 @@ SET vertical = "shops";
         AND map.created_date >=  DateIndicator
         AND test_name NOT LIKE "%miscon%"
         AND delivery_distance IS NOT NULL
-        AND travel_time IS NOT NULL    
+        AND travel_time IS NOT NULL
+        AND vertical_type <> 'restaurants' 
+        AND test_name in UNNEST(test_arrays)
+
         )
 
     , add_rdf_contribution as (
@@ -156,46 +187,15 @@ SET vertical = "shops";
     select
     *
     from add_rdf_contribution;
-
-
-    IF vertical = "food" THEN
-      # load only food tests
-      # load only restaurants orders
-      EXECUTE IMMEDIATE(
-
-        """
-        CREATE OR REPLACE TEMP TABLE pre_staging_orders AS
-        select
-        stg.*
-        from pre_staging_orders stg
-        WHERE vertical_type = "restaurants"
-        """
-      );
-
-    ELSE
-      # load only shops tests
-      # load only shops orders
-      EXECUTE IMMEDIATE(
-
-        """
-        CREATE OR REPLACE TEMP TABLE pre_staging_orders AS
-        select
-        stg.*
-        from pre_staging_orders stg
-        WHERE vertical_type <> "restaurants"
-        """
-      );
-    END IF;
-
-
-    CREATE OR REPLACE TEMP TABLE staging_orders AS  
-
-    WITH orders AS (
+ 
+ 
+  CREATE OR REPLACE TEMP TABLE staging_orders AS  
+  with orders_data AS (
         SELECT
         test_name
         , variant
         , target_group
-        , COUNT(DISTINCT platform_order_code) AS Order_qty
+        , COUNT(DISTINCT platform_order_code) AS Orders
         , COUNT(DISTINCT CASE WHEN vendor_price_scheme_type = "Campaign" then platform_order_code end) as Campaign_Orders
         , COUNT(DISTINCT CASE WHEN is_rdf_order then platform_order_code end) as RDF_Orders
         , SUM(delivery_fee_local) AS delivery_fee_local
@@ -217,12 +217,15 @@ SET vertical = "shops";
         group by 1,2,3
     )
 
+
+####### CALCULATE METRICS AT TARGET GROUP LEVEL
+
     , treatment_level_kpi as (
         select
         test_name
         , variant
         , "Treatment" as target_group
-        , sum(Order_qty) Order_qty
+        , sum(Orders) Orders
         , sum(Campaign_Orders) Campaign_Orders
         , SUM(RDF_Orders) as RDF_Orders
         , SUM(delivery_fee_local) AS delivery_fee_local
@@ -241,44 +244,43 @@ SET vertical = "shops";
         , sum(rdf_vendor_contribution) as rdf_vendor_contribution
         , MAX(created_date) AS created_date
 
-        from orders
+        from orders_data
         where target_group is not null
         group by 1,2,3
     )
 
-    , all_level_metric as (
+    , test_level_metric as (
         select
         test_name
-        , variant
-        , "All" as target_group
-        , sum(Order_qty) Order_qty
-        , sum(Campaign_Orders) Campaign_Orders
-        , SUM(RDF_Orders) as RDF_Orders
-        , SUM(delivery_fee_local) AS delivery_fee_local
-        , SUM(dps_delivery_fee_local) AS dps_delivery_fee_local
-        , SUM(dps_surge_fee_local) AS dps_surge_fee_local
-        , SUM(dps_minimum_order_value_local) AS dps_minimum_order_value_local
-        , SUM(gfv_local) AS gfv_local
-        , SUM(gfv_eur) AS gfv_eur
-        , SUM(commission_local) AS commission_local
-        , SUM(delivery_costs_local) AS delivery_costs_local
-        , SUM(to_customer_time) AS to_customer_time
-        , SUM(travel_time) AS travel_time
-        , SUM(delivery_distance) AS delivery_distance
-        , SUM(mean_delay) AS mean_delay
-        , SUM(service_fee_local) as service_fee_local
-        , sum(rdf_vendor_contribution) as rdf_vendor_contribution
-        , MAX(created_date) AS created_date
-
-        from orders
+          , variant
+          , "All" as target_group
+          , sum(Orders) Orders
+          , sum(Campaign_Orders) Campaign_Orders
+          , SUM(RDF_Orders) as RDF_Orders
+          , SUM(delivery_fee_local) AS delivery_fee_local
+          , SUM(dps_delivery_fee_local) AS dps_delivery_fee_local
+          , SUM(dps_surge_fee_local) AS dps_surge_fee_local
+          , SUM(dps_minimum_order_value_local) AS dps_minimum_order_value_local
+          , SUM(gfv_local) AS gfv_local
+          , SUM(gfv_eur) AS gfv_eur
+          , SUM(commission_local) AS commission_local
+          , SUM(delivery_costs_local) AS delivery_costs_local
+          , SUM(to_customer_time) AS to_customer_time
+          , SUM(travel_time) AS travel_time
+          , SUM(delivery_distance) AS delivery_distance
+          , SUM(mean_delay) AS mean_delay
+          , SUM(service_fee_local) as service_fee_local
+          , sum(rdf_vendor_contribution) as rdf_vendor_contribution
+          , MAX(created_date) AS created_date
+        from orders_data
         group by 1,2,3
     )
 
-    , join_order_metrics as (
+    , append_order_metrics as (
         (
             select
             *
-            from orders
+            from orders_data
             where target_group is not null 
         )
 
@@ -295,105 +297,61 @@ SET vertical = "shops";
         (
             select
             *
-            from all_level_metric
+            from test_level_metric
         )
     )
 
-    ---- Users using ga_sessions
+########## COMBINE TEST_METRICS
 
-    , session_test_data as (
-        select distinct
-        test_id as experiment_id
-        , test_name
-        , entity_id as global_entity_id
-        , test_start_date
-        , IFNULL(test_end_date, CURRENT_TIMESTAMP()) as test_end_date
+  , orders_wave_metrics as (
 
-        from `fulfillment-dwh-production.cl.dps_experiment_setups`
-        where country_code = CtryCode
-        and date(test_start_date) >= date_add(DateIndicator, interval 8 month)
-    )
+  select
+   AllTestVar as test_name
+    , variant 
+    , target_group
+    , SUM(Orders) Orders
+    , SUM(Campaign_Orders) as Campaign_Orders
+    , SUM(RDF_Orders) as RDF_Orders
+    , SUM(delivery_fee_local) AS delivery_fee_local
+    , SUM(dps_delivery_fee_local) AS dps_delivery_fee_local
+    , SUM(dps_surge_fee_local) AS dps_surge_fee_local
+    , SUM(dps_minimum_order_value_local) AS dps_minimum_order_value_local
+    , SUM(gfv_local) AS gfv_local
+    , SUM(gfv_eur) AS gfv_eur
+    , SUM(commission_local) AS commission_local
+    , SUM(delivery_costs_local) AS delivery_costs_local
+    , SUM(to_customer_time) AS to_customer_time
+    , SUM(travel_time) AS travel_time
+    , SUM(delivery_distance) AS delivery_distance
+    , SUM(mean_delay) AS mean_delay
+    , SUM(service_fee_local) as service_fee_local
+    , sum(rdf_vendor_contribution) as rdf_vendor_contribution
+    , MAX(created_date) AS created_date
+  from append_order_metrics
+  WHERE test_name <> riyadh_test
+  Group by 1,2,3
 
-    , unique_list_of_users as (
+)
 
-        select distinct
-        test_name
-        , s.global_entity_id
-        , date(test_start_date) as test_start_date
-        , date(test_end_date) as test_end_date
-        , fullvisitor_id
-        , sessions.experiment_id
-        , sessions.variant
-        , sessions.perseus_client_id
 
-        from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_ga_sessions` ga
-        INNER JOIN session_test_data s
-        ON ga.sessions.experiment_id = s.experiment_id
-        AND  ga.entity_id = s.global_entity_id
-        where TRUE
-        AND sessions.variant <> "Original"
-        AND sessions.variant IS NOT NULL
-        AND country_code = CtryCode
-        and created_date >= date_add(DateIndicator, interval 8 month)
-    )
-
-    , aggregate_cvr_metrics as (
+, orders_append_wave_metrics as (
+  (
     select
-    test_name
-    , variant
-    , "All" as target_group
-    , COUNT(DISTINCT session_id) AS total_sessions
+    *
+    from append_order_metrics
+  )
 
-    , safe_divide(
-        NULLIF(SUM (mCVR1), 0)
-        , NULLIF(COUNT (mCVR1),0)
-        ) AS mCVR1
+  UNION ALL
 
-    ,  safe_divide(
-        NULLIF(SUM (mCVR2), 0)
-        , NULLIF(COUNT (mCVR2),0)
-        ) AS mCVR2
+  (
+    select
+    *
+    from orders_wave_metrics
+  )
+)
 
-    ,  safe_divide(
-        NULLIF(SUM (mCVR3), 0)
-        , NULLIF(COUNT (mCVR3),0)
-        ) AS mCVR3
 
-    ,  safe_divide(
-        NULLIF(SUM (mCVR4), 0)
-        , NULLIF(COUNT (mCVR4),0)
-        ) AS mCVR4
-
-    ,  safe_divide(
-        COUNT(DISTINCT CASE WHEN has_order = 1 THEN session_id END)
-        , COUNT(DISTINCT session_id)
-        ) AS CVR
-
-    from `fulfillment-dwh-production.curated_data_shared_product_analytics.ga_sessions` ga_sessions
-    INNER JOIN unique_list_of_users
-        ON ga_sessions.fullvisitor_id = unique_list_of_users.fullvisitor_id
-        AND ga_sessions.global_entity_id = unique_list_of_users.global_entity_id
-        AND partition_date BETWEEN test_start_date and test_end_date
-    where partition_date >= date_add(DateIndicator, interval 8 month)
-    AND dh_brand = "hungerstation"
-    AND data_source = "app"
-    AND ga_sessions.global_entity_id = "HS_SA"
-    ---- Bug in Android Versions that prevented us to track session data
-    ----https://deliveryhero.slack.com/archives/C03V0040SC9/p1672828786018059
-    AND (
-        CASE 
-            WHEN (partition_date BETWEEN "2022-12-01" AND "2023-01-12") 
-            AND frontend_client_type = "Android" 
-            AND app_browser IN ("8.0.102", "8.0.103")
-            THEN FALSE
-            ELSE TRUE
-        END
-        )
-    group by 1,2,3
-
-    )
------------
-
+  ########### SESSION DATA
 
     , users AS (
         SELECT 
@@ -420,67 +378,114 @@ SET vertical = "shops";
         AND variant IS NOT NULL
         AND target_group IS NOT NULL 
         AND test_name NOT LIKE "%iscon%"
+        AND test_name in UNNEST(test_arrays)
         AND created_date >= DateIndicator
         GROUP BY 1,2,3
     )
 
-    -- , users_treatment_level as (
+    , users_treatment_level as (
 
 
-    --     SELECT 
-    --     test_name
-    --     , variant
-    --     , "Treatment" as target_group
-    --     , SUM(total_sessions) AS total_sessions
-    --     , SUM(Distinct_users) AS Distinct_users
-    --     , SUM(transaction_no_count) AS transaction_no_count
-    --     , SUM(list_menu_count) AS list_menu_count
-    --     , SUM(shop_list_no_count) as shop_list_no_count
-    --     , sum(shop_menu_no_count) as shop_menu_no_count
-    --     , SUM(menu_checkout_count) AS menu_checkout_count
-    --     , sum(checkout_no_count) as checkout_no_count
-    --     , SUM(checkout_transaction_count) AS checkout_transaction_count
-    --     , MIN(min_date) AS min_date
-    --     , MAX(max_date) AS max_date
+        SELECT 
+        test_name
+        , variant
+        , "Treatment" as target_group
+        , SUM(total_sessions) AS total_sessions
+        , SUM(Distinct_users) AS Distinct_users
+        , SUM(transaction_no_count) AS transaction_no_count
+        , SUM(list_menu_count) AS list_menu_count
+        , SUM(shop_list_no_count) as shop_list_no_count
+        , sum(shop_menu_no_count) as shop_menu_no_count
+        , SUM(menu_checkout_count) AS menu_checkout_count
+        , sum(checkout_no_count) as checkout_no_count
+        , SUM(checkout_transaction_count) AS checkout_transaction_count
+        , MIN(min_date) AS min_date
+        , MAX(max_date) AS max_date
 
-    --     from users
-    --     where target_group <> "All"
-    --     GROUP BY 1,2,3
-    -- )
+        from users
+        where target_group <> "All"
+        GROUP BY 1,2,3
+    )
 
-    , correct_user_distinct_users as (
+
+    , union_user_metrics as (
+        (
+            select
+            *
+            from users
+        )
+
+        UNION ALL
+        (
+            select
+            *
+            from users_treatment_level
+        )
+    )
+
+
+  ######## USERS WAVE METRICS
+
+        , users_wave_metrics as (
+        SELECT 
+        AllTestVar
+        , variant
+        , target_group
+        , SUM(total_sessions) AS total_sessions
+        , SUM(Distinct_users) AS Distinct_users
+        , SUM(transaction_no_count) AS transaction_no_count
+        , SUM(list_menu_count) AS list_menu_count
+        , SUM(shop_list_no_count) as shop_list_no_count
+        , sum(shop_menu_no_count) as shop_menu_no_count
+        , SUM(menu_checkout_count) AS menu_checkout_count
+        , sum(checkout_no_count) as checkout_no_count
+        , SUM(checkout_transaction_count) AS checkout_transaction_count
+        , MIN(min_date) AS min_date
+        , MAX(max_date) AS max_date
+
+        from union_user_metrics
+        WHERE test_name <> riyadh_test
+        group by 1,2,3
+
+    )
+
+
+        , users_append_wave_metrics as (
+          
+          (
+            select
+            *
+            from union_user_metrics
+          )
+
+          UNION ALL
+          (
+            SELECT
+            *
+            FROM users_wave_metrics
+          )
+  )
+
+      , correct_user_distinct_users as (
         select
         test_name
         , variant 
         , Distinct_users
 
-        from users
+        from users_append_wave_metrics
         where target_group = "All"
 
     )
 
-    -- , union_user_metrics as (
-    --     (
-    --         select
-    --         *
-    --         from users
-    --     )
-
-    --     UNION ALL
-    --     (
-    --         select
-    --         *
-    --         from users_treatment_level
-    --     )
-    -- )
+  ######## AVG METRICS
 
     , join_users_to_orders as (
         select
         o.*
-        , s.* except(test_name, variant, target_group)
+        , s.* except(test_name, variant, target_group, Distinct_users)
         , d.Distinct_users
-        from join_order_metrics o
-        LEFT JOIN  aggregate_cvr_metrics s
+        from orders_append_wave_metrics o
+        LEFT JOIN  users_append_wave_metrics s
             using(test_name, variant, target_group)
         LEFT JOIN correct_user_distinct_users d
             using(test_name, variant)
@@ -493,44 +498,42 @@ SET vertical = "shops";
         ,  test_name
         ,  variant
         ,  target_group
-        ,  Order_qty as Orders
+        ,  Orders
         ,  Campaign_Orders
         ,  RDF_Orders
-        ,  safe_divide(delivery_fee_local, Order_qty) AS Avg_Paid_DF
-        ,  safe_divide(dps_delivery_fee_local, Order_qty) AS Avg_DPS_DF
-        ,  safe_divide(dps_surge_fee_local, Order_qty) AS Avg_Surge_Fee
-        ,  safe_divide(dps_minimum_order_value_local, Order_qty) AS AVG_MOV
-        ,  safe_divide(gfv_local, Order_qty) AS AVG_FV
-        ,  safe_divide(gfv_eur, Order_qty) AS AVG_FV_EUR
-        ,  safe_divide(commission_local, Order_qty) AS AVG_Commission
-        ,  safe_divide(delivery_costs_local, Order_qty) AS AVG_Delivery_Costs
-        ,  safe_divide(to_customer_time, Order_qty) AS AVG_To_Customer_Time
-        ,  safe_divide(travel_time, Order_qty) AS AVG_Travel_Time
-        ,  safe_divide(delivery_distance, Order_qty) AS AVG_Manhattan_Distance
-        ,  safe_divide(mean_delay, Order_qty) AS AVG_Fleet_Delay
-        ,  safe_divide(service_fee_local, Order_qty) as AVG_Service_Fee
-        ,  safe_divide(rdf_vendor_contribution, Order_qty) as AVG_rdf_vendor_contribution
+        ,  safe_divide(delivery_fee_local, Orders) AS Avg_Paid_DF
+        ,  safe_divide(dps_delivery_fee_local, Orders) AS Avg_DPS_DF
+        ,  safe_divide(dps_surge_fee_local, Orders) AS Avg_Surge_Fee
+        ,  safe_divide(dps_minimum_order_value_local, Orders) AS AVG_MOV
+        ,  safe_divide(gfv_local, Orders) AS AVG_FV
+        ,  safe_divide(gfv_eur, Orders) AS AVG_FV_EUR
+        ,  safe_divide(commission_local, Orders) AS AVG_Commission
+        ,  safe_divide(delivery_costs_local, Orders) AS AVG_Delivery_Costs
+        ,  safe_divide(to_customer_time, Orders) AS AVG_To_Customer_Time
+        ,  safe_divide(travel_time, Orders) AS AVG_Travel_Time
+        ,  safe_divide(delivery_distance, Orders) AS AVG_Manhattan_Distance
+        ,  safe_divide(mean_delay, Orders) AS AVG_Fleet_Delay
+        ,  safe_divide(service_fee_local, Orders) as AVG_Service_Fee
+        ,  safe_divide(rdf_vendor_contribution, Orders) as AVG_rdf_vendor_contribution
         ,  created_date as max_order_date
         ,  total_sessions
         ,  Distinct_users
-        ,  CVR
-        ,  mCVR1
-        ,  mCVR2
-        ,  mCVR3
-        ,  mCVR4
-        -- ,  safe_divide(transaction_no_count, total_sessions) AS CVR
-        -- ,  safe_divide(list_menu_count, shop_list_no_count) AS mCVR2
-        -- ,  safe_divide(menu_checkout_count , shop_menu_no_count) AS mCVR3
-        -- ,  safe_divide(checkout_transaction_count, checkout_no_count) AS mCVR4
-        -- , min_date AS min_date
-        -- , max_date AS max_date
+        ,  safe_divide(transaction_no_count, total_sessions) AS CVR
+        ,  safe_divide(list_menu_count, shop_list_no_count) AS mCVR2
+        ,  safe_divide(menu_checkout_count , shop_menu_no_count) AS mCVR3
+        ,  safe_divide(checkout_transaction_count, checkout_no_count) AS mCVR4
+        ,  min_date AS start_date
+        ,  max_date AS end_date
+        ,  safe_divide(transaction_no_count , shop_menu_no_count) AS CVR3
+
 
     from join_users_to_orders
-
     )
-
-
-    , test_list_info AS (
+     
+ 
+  ####################### TEST INFO
+  
+    , test_list AS (
         SELECT DISTINCT 
         exper.test_name,
         (CAST(exper.variation_share AS FLOAT64)/100)  AS percentage,
@@ -541,43 +544,67 @@ SET vertical = "shops";
         exper.test_end_date
         FROM `fulfillment-dwh-production.cl.dps_experiment_setups` exper
         LEFT JOIN `fulfillment-dwh-production.cl.audit_logs` logs ON exper.test_name = logs.dps.create_experiment.name
-        INNER JOIN (
-            select distinct
-            test_name
-            from calculate_avg_metrics
-        ) so
-            on exper.test_name = so.test_name
         WHERE 1=1
         AND exper.country_code = CtryCode 
         AND variation_group = 'Variation1'
         AND exper.test_name NOT LIKE "%miscon%"
         AND EXTRACT(DATE FROM test_start_date) >= DateIndicator
+        AND exper.test_name in UNNEST(test_arrays)
+
     )
+
+
+    , add_is_all as (
+      select
+      AllTestVar as test_name
+      , WaveShare  
+      , CAST(NULL AS STRING)
+      , CAST(NULL AS BOOL) 
+      , CAST(NULL AS STRING)
+      , CAST(WaveStart AS TIMESTAMP)
+      , CAST(WaveEnd AS TIMESTAMP)
+    )
+
+    , union_test as (
+      (
+        select
+        *
+        from test_list
+      )
+
+      UNION ALL
+
+      (
+        select
+        *
+        from add_is_all
+      )
+    )
+
+  ####################### JOIN TEST INFO
 
     , add_test_list_info as (
 
-        select
-        o.*,
-        tl.* except(test_name)
-        from calculate_avg_metrics o
-        LEFT JOIN test_list_info tl
-            using(test_name)
+          select
+          o.*,
+          tl.* except(test_name)
+          from calculate_avg_metrics o
+          LEFT JOIN union_test tl
+              using(test_name)
 
-    )
+      )
 
-    SELECT * FROM add_test_list_info;
- 
-
--- Persist Data
+      SELECT * FROM add_test_list_info;
 
 
+  ############ PERSIST TABLES
 
-    EXECUTE IMMEDIATE (
-        '''
-        CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing._'''|| upper(CtryCode) ||'''_AB_Results_Orders_'''|| vertical ||'''`
-        AS
-        SELECT
-        *
-        FROM staging_orders
-        '''
-    );
+      EXECUTE IMMEDIATE (
+          '''
+          CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing._'''|| upper(CtryCode) ||'''_AB_Results_Orders_NFV`
+          AS
+          SELECT
+          *
+          FROM staging_orders
+          '''
+      );

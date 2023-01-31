@@ -1,25 +1,17 @@
--- CREATE OR REPLACE TEMP TABLE dps_vendor_history AS
+----------------------------------------------------------------------------------------------------------------------------
+--                NAME: XXXXX.sql
+--               OWNER: Logistics Data Analytics/Customer
+--      INITIAL AUTHOR: Fatima Rodriguez
+--       CREATION DATE: XXXXX
+--         DESCRIPTION: This table contains all historical information about Vendor ASA price configuration, on version level.
+--
+--        QUERY OUTPUT: Every price verision at vendor level can be obtained.
+--               NOTES: XXXXX
+--                      ----------------------------------
 
-########## DECLARE VARIABLES
 
-DECLARE date_partition TIMESTAMP;
-DECLARE run_date TIMESTAMP;
-DECLARE backfill BOOL;
-
-########## SET RUN MODE
-SET backfill = TRUE;
-
-# SET END DATE 
-SET run_date = CURRENT_TIMESTAMP();
-
-# SET PARTITION DATE
-IF backfill THEN 
-    SET date_partition = TIMESTAMP_SUB("2021-01-01", interval 7 DAY); 
-ELSE
-    SET date_partition = TIMESTAMP_SUB(run_date, interval 7 DAY);
-END IF; 
-
-CREATE TEMP TABLE staging_vendor_asa_config
+CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing.dps_vendor_asa_config_versions_v2`
+CLUSTER BY entity_id, vendor_code
 AS
 with unnest_vendor as (
   SELECT entity_id
@@ -30,8 +22,7 @@ with unnest_vendor as (
     , LAG(asa_id) OVER(PARTITION BY entity_id, vendor_id ORDER BY active_from) as prev_asa_id
   FROM `dh-logistics-product-ops.pricing.dps_asa_vendor_assignments` 
   LEFT JOIN UNNEST(sorted_assigned_vendor_ids) AS vendor_id
-  WHERE active_from BETWEEN date_partition AND run_date -- only new versions
-  AND vendor_id IS NOT NULL
+  WHERE vendor_id IS NOT NULL
   AND vendor_id <> ""
 
 )
@@ -54,7 +45,6 @@ with unnest_vendor as (
   SELECT * EXCEPT(active_to)
     , IFNULL(active_to, "2099-01-01") AS active_to
   FROM `dh-logistics-product-ops.pricing.dps_asa_price_config_versions`
-  WHERE active_from BETWEEN date_partition - interval 1 day AND run_date -- only new versions
 )
 
 , join_price_config AS (
@@ -70,6 +60,25 @@ with unnest_vendor as (
     AND vendor_config.active_from <> vendor_config.active_to
     AND vendor_config.active_from < asa_price_config.active_to
     AND vendor_config.active_to > asa_price_config.active_from  
+)
+
+, vendor_price_mechanisms as (
+    SELECT entity_id
+      , vendor_code
+      , active_from
+      , MAX(asa_condition_mechanisms.asa_has_time_condition) as vendor_has_time_condition
+      , MAX(asa_condition_mechanisms.asa_has_customer_condition) as vendor_has_customer_condition
+      , MAX(asa_condition_mechanisms.asa_has_customer_area) as vendor_has_customer_area
+      , MAX(scheme_price_mechanisms.is_dbdf) as vendor_has_dbdf
+      , MAX(scheme_price_mechanisms.is_dbmov) as vendor_has_dbmov
+      , MAX(scheme_price_mechanisms.is_surge_mov) as vendor_has_surge_mov
+      , MAX(scheme_price_mechanisms.is_small_order_fee) as vendor_has_small_order_fee
+      , MAX(scheme_price_mechanisms.is_fleet_delay) as vendor_has_fleet_delay
+      , MAX(scheme_price_mechanisms.is_service_fee) as vendor_has_service_fee
+      , MAX(scheme_price_mechanisms.is_basket_value_deal) as vendor_has_basket_value_deal
+  FROM join_price_config
+  LEFT JOIN UNNEST(asa_price_config) schemes
+  GROUP BY 1,2,3
 )
 
 , vendor_full_asa_config as (
@@ -89,35 +98,31 @@ with unnest_vendor as (
 FROM join_price_config
 GROUP BY 1, 2, 3, 4
 )
+
+, add_vendor_price_mechanisms as (
+  SELECT
+  entity_id
+    , vendor_code
+    , active_from
+    , active_to
+    , STRUCT( vendor_has_dbdf
+      , vendor_has_dbmov
+      , vendor_has_surge_mov
+      , vendor_has_small_order_fee
+      , vendor_has_fleet_delay
+      , vendor_has_service_fee
+      , vendor_has_basket_value_deal
+      , vendor_has_time_condition
+      , vendor_has_customer_condition
+      , vendor_has_customer_area
+    ) as vendor_price_mechanisms
+    , dps_asa_configuration_history
+    FROM vendor_full_asa_config
+    LEFT JOIN vendor_price_mechanisms
+      USING(entity_id, vendor_code, active_from)
+)
+
+
+
 SELECT *
-FROM vendor_full_asa_config
--- WHERE entity_id = "PY_AR"
--- and vendor_code = "62168" 
--- order by active_from
-;
-
-
-###### UPSERT
-IF backfill THEN 
-  CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing.dps_vendor_asa_config_versions_v2`
-  CLUSTER BY entity_id, vendor_code
-  AS
-  SELECT * FROM staging_vendor_asa_config;
-ELSE
-  MERGE INTO `dh-logistics-product-ops.pricing.dps_vendor_asa_config_versions_v2` dps_vendor
-  USING staging_vendor_asa_config stg
-    ON dps_vendor.entity_id = stg.entity_id
-    AND dps_vendor.vendor_code = stg.vendor_code
-    AND dps_vendor.active_from = stg.active_from
-
-  WHEN MATCHED THEN
-    UPDATE SET
-      entity_id = stg.entity_id
-      , vendor_code = stg.vendor_code
-      , active_from = stg.active_from
-      , active_to = stg.active_to
-      , dps_asa_configuration_history = stg.dps_asa_configuration_history
-  WHEN NOT MATCHED THEN
-    INSERT ROW
-  ;
-end if;
+FROM add_vendor_price_mechanisms
