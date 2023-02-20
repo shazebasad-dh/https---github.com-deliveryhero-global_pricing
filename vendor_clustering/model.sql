@@ -1,13 +1,4 @@
-CREATE OR REPLACE MODEL
-  `dh-logistics-product-ops.pricing.vendor_clustering_model_ar_food_afv_distance_custom_c5` 
-  OPTIONS(
-    model_type = 'kmeans',
-    num_clusters = 5,
-    standardize_features = true,
-    distance_type = 'COSINE',
-    kmeans_init_method = 'CUSTOM',
-    kmeans_init_col = 'init_col',
-    max_iterations = 50) AS
+create or replace table `dh-logistics-product-ops.pricing.vendor_clustering_model_ar_food_afv_distance_data` as
 with
 cities as (
   select
@@ -94,52 +85,52 @@ select
   approx_quantiles(avg_distance, 100) p_avg_distance,
 from aggregated_kpis
 group by 1)
-select
-  global_entity_id,
-  null city_name,
-  p_afv[offset(50)] afv,
-  p_avg_distance[offset(50)] avg_distance,
-  true init_col,
-from percentiles
-union all
-select
-  global_entity_id,
-  null city_name,
-  p_afv[offset(25)] afv,
-  p_avg_distance[offset(25)] avg_distance,
-  true init_col,
-from percentiles
-union all
-select
-  global_entity_id,
-  null city_name,
-  p_afv[offset(75)] afv,
-  p_avg_distance[offset(75)] avg_distance,
-  true init_col,
-from percentiles
-union all
-select
-  global_entity_id,
-  null city_name,
-  p_afv[offset(25)] afv,
-  p_avg_distance[offset(75)] avg_distance,
-  true init_col,
-from percentiles
-union all
-select
-  global_entity_id,
-  null city_name,
-  p_afv[offset(75)] afv,
-  p_avg_distance[offset(25)] avg_distance,
-  true init_col,
-from percentiles
-union all
-select
-  global_entity_id,
-  city_name,
-  afv,
-  avg_distance,
-  false init_col,
-from aggregated_kpis
-where afv < (select p_afv[offset(99)] from percentiles)
-  and avg_distance < (select p_avg_distance[offset(99)] from percentiles)
+  select
+    global_entity_id,
+    null city_name,
+    p_afv[offset(50)] afv,
+    p_avg_distance[offset(50)] avg_distance,
+    true init_col,
+  from percentiles
+  union all
+  select
+    global_entity_id,
+    null city_name,
+    p_afv[offset(25)] afv,
+    p_avg_distance[offset(25)] avg_distance,
+    true init_col,
+  from percentiles
+  union all
+  select
+    global_entity_id,
+    null city_name,
+    p_afv[offset(75)] afv,
+    p_avg_distance[offset(75)] avg_distance,
+    true init_col,
+  from percentiles
+  union all
+  select
+    global_entity_id,
+    null city_name,
+    p_afv[offset(25)] afv,
+    p_avg_distance[offset(75)] avg_distance,
+    true init_col,
+  from percentiles
+  union all
+  select
+    global_entity_id,
+    null city_name,
+    p_afv[offset(75)] afv,
+    p_avg_distance[offset(25)] avg_distance,
+    true init_col,
+  from percentiles
+  union all
+  select
+    global_entity_id,
+    city_name,
+    afv,
+    avg_distance,
+    false init_col,
+  from aggregated_kpis
+  where afv < (select p_afv[offset(99)] from percentiles)
+    and avg_distance < (select p_avg_distance[offset(99)] from percentiles)
