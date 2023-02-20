@@ -9,5 +9,5 @@ create or replace model
     kmeans_init_col = 'init_col',
     max_iterations = 50) as
 select
-  *
+  * except(vendor_id)
 from `dh-logistics-product-ops.pricing.vendor_clustering_model_ar_food_afv_distance_data`
