@@ -5,8 +5,9 @@ create or replace model
     num_clusters = 5,
     standardize_features = true,
     distance_type = 'COSINE',
-    kmeans_init_method = 'CUSTOM',
-    kmeans_init_col = 'init_col',
+    kmeans_init_method = 'KMEANS++',
+    -- kmeans_init_method = 'CUSTOM',
+    -- kmeans_init_col = 'init_col',
     max_iterations = 50) as
 select
   * except(vendor_id)
