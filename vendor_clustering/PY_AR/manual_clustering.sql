@@ -48,6 +48,10 @@ orders as (
     v.vendor_id,
     o.value.gbv_eur gbv,
     v.city_name,
+    ###ADD MORE KPIs HERE
+    o.value.delivery_fee_eur+o.value.service_fee_eur + o.value.mov_customer_fee_eur as cf,
+    o.value.delivery_fee_eur + o.value.service_fee_eur + o.value.commission_eur + o.value.mov_customer_fee_eur + o.value.joker_vendor_fee_eur as take_in,
+        o.value.voucher_dh_eur + o.value.discount_dh_eur incentives, 
     cast(st_distance(
       v.vendor_location,
       st_geogpoint(o.delivery_location.longitude, o.delivery_location.latitude)
@@ -59,7 +63,7 @@ orders as (
     and o.global_entity_id = 'PY_AR'
     and o.is_sent
     and o.is_own_delivery
-    group by 1,2,3,4,5 
+    group by 1,2,3,4,5,6,7,8 
     
     ##Remover ordenes outliers BV
     ##Remove ordenes outliers for distance
@@ -87,7 +91,7 @@ grouped_city as (
     global_entity_id,
     vendor_id,
     g.city_grouped city_name,
-    --count(vendor_id) orders,
+    count(vendor_id) orders,
     avg(gbv) afv,
     avg(distance) avg_distance
     from orders
@@ -99,6 +103,8 @@ grouped_city as (
 normalized_kpis as (
 select 
 *,
+percent_rank() over (partition by global_entity_id order by afv asc) p_afv,
+percent_rank() over (partition by global_entity_id order by avg_distance asc) p_dist,
 ((afv - AVG(afv) OVER ()) / 
          NULLIF(STDDEV_POP(afv) OVER (), 0) 
        ) AS afv_normalized,
@@ -109,6 +115,12 @@ from aggregated_kpis
 )
 
 select
-*
--- CASE when (ABS((p_afv-0.5)^2)+ABS((p_dist-0.5)^2))^1/2 < ((100^2)*0.2/pi)^0.5
+*,
+CASE when POW(POW(ABS(p_afv-0.5), 2) + POW(ABS(p_dist-0.5),2),0.5) < POW(POW(1,2)*0.2/3.14159,0.5)  then  'Cluster 1'
+when ABS(p_afv)>0.5 and ABS(p_dist)>0.5 then 'Cluster 5'
+when ABS(p_afv)<0.5 and ABS(p_dist)>0.5 then 'Cluster 4'
+when ABS(p_afv)>0.5 and ABS(p_dist)<0.5 then 'Cluster 3'
+when ABS(p_afv)<0.5 and ABS(p_dist)<0.5 then 'Cluster 2'
+end as centroid_id
 from normalized_kpis
+Order by centroid_id asc
