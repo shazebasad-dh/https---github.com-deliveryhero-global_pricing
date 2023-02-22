@@ -1,4 +1,5 @@
 create or replace table `dh-logistics-product-ops.pricing.vendors_clustered` as
+## add the other PY countries to the query
 with
 vendors as (
   select
@@ -6,6 +7,7 @@ vendors as (
     v.vendor_id,
     v.vendor_name,
     -- st_geogpoint(v.location.longitude, v.location.latitude) vendor_location,
+  ## how can we make the exception handling more scalable for more countries?
     ('FastFood-AR' in unnest(v2.tags) 
       or v.vendor_id in ('190757', '191419', '191412', '191411', '191408', '191439', '311004', '391493')
       or v.vendor_id in ('388770', '389866', '389505')
@@ -39,6 +41,7 @@ orders as (
     and o.entity_id = 'PY_AR'
     and o.is_sent
     and o.is_own_delivery
+  ## remove the subscribed orders?
   ## remove outliers: >= 5 std deviations above the median
   qualify o.gfv_eur < percentile_cont(o.gfv_eur, 0.5) over (partition by o.entity_id) + 5 * stddev_pop(o.gfv_eur) over (partition by o.entity_id)
   and o.linear_dist_customer_vendor < percentile_cont(o.linear_dist_customer_vendor, 0.5) over (partition by o.entity_id) + 5 * stddev_pop(o.linear_dist_customer_vendor) over (partition by o.entity_id)
