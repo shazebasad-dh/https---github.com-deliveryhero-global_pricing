@@ -3,138 +3,204 @@
 --               OWNER: Logistics Data Analytics/Customer
 --      INITIAL AUTHOR: Fatima Rodriguez
 --       CREATION DATE: XXXXX
---         DESCRIPTION: This table contains all historical information about DPS ASA vendor assignment, on version level.
+--         DESCRIPTION: This table contains all historical information about DPS ASA vendor assignment and price configuration, on version level.
 --
---        QUERY OUTPUT: Every version of every vendor assigned to an ASA can be obtained.
+--        QUERY OUTPUT: Every version of every ASA configuration can be obtained.
 --               NOTES: XXXXX
 --                      ----------------------------------
 
-CREATE TEMP FUNCTION parse_vendor_filter(json STRING)
-RETURNS ARRAY<
-  STRUCT<
-    key STRING,
-    clause STRING,
-    value ARRAY<STRING>
-  >
->
-LANGUAGE js AS """
-  const filterRaw = JSON.parse(json);
-  if (filterRaw) {
-    const criteria = filterRaw['criteria'];
-    Object.keys(criteria).forEach(k => {
-        criteria[k]['key'] = k;
-        values = criteria[k]['value']
-        if (!Array.isArray(values)) {
-            criteria[k]['value'] = [values]
-        }
-    });
-    return Object.values(criteria);
-  } else {
-      return [];
-  }
-"""
-;
 
-
-############################## DPS ASA VENDOR CONFIG ##############################
-
-  CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing.dps_asa_vendor_assignments` 
+  CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing.dps_asa_full_config_versions` 
   CLUSTER BY entity_id, asa_id
   AS
-  WITH load_asa_vendor AS (
-    SELECT 
-      global_entity_id AS entity_id
-      , country_code
-      , vendor_group_assignment_id AS asa_id
-      , vendor_group_id
-      , name AS asa_name
-      , TIMESTAMP_TRUNC(created_at, MINUTE) AS created_at
-      , TIMESTAMP_TRUNC(updated_at, MINUTE) AS updated_at
-      , ROW_NUMBER() OVER(PARTITION BY global_entity_id, vendor_group_assignment_id ORDER BY updated_at) AS _row_number
-      , deleted
-      , priority
-      , ARRAY((SELECT x FROM UNNEST(assigned_vendor_ids) x ORDER BY x)) AS sorted_assigned_vendor_ids
-  FROM `fulfillment-dwh-production.hl.dynamic_pricing_vendor_group_assignment` 
-  WHERE ( (type = "BASIC") OR (type IS NULL) )
-  )
-  ---- SET CORRECT UPDATED_AT
-  , set_active_from AS (
-  SELECT * EXCEPT(created_at, updated_at)
-    , IF(_row_number = 1, created_at, updated_at) AS active_from
-  from load_asa_vendor
-  )
-  ----- GENERATE HASH AND COMPOSITE PK
-  , generate_vendor_hash AS (
-    SELECT *
-      -- create a hash to use later to keep info if a new vendor was added during a specific version
-      , SHA256(ARRAY_TO_STRING(sorted_assigned_vendor_ids, "")) AS assigned_vendor_hash
-      , ARRAY_LENGTH(sorted_assigned_vendor_ids) as assigned_vendors_count
-    FROM set_active_from
+    WITH asa_vendor_config AS (
+    SELECT * EXCEPT(active_to)
+      , IFNULL(active_to, "2099-01-01") AS active_to
+    FROM `dh-logistics-product-ops.pricing.dps_asa_vendor_assignments`
   )
 
-  , generate_pk_version AS (
+  , asa_price_config AS (
+    SELECT * EXCEPT(active_to)
+      , IFNULL(active_to, "2099-01-01") AS active_to
+    FROM `dh-logistics-product-ops.pricing.dps_asa_price_config_versions`
+  )
+
+  , join_price_config AS (
+    SELECT asa_vendor_config.* EXCEPT(active_from, active_to)
+    , asa_price_config.* EXCEPT(active_from, active_to, asa_id, entity_id, country_code)
+    -- , asa_price_config.active_from as config_active_from
+    , GREATEST(asa_vendor_config.active_from, asa_price_config.active_from) AS active_from
+  
+    FROM asa_vendor_config 
+    LEFT JOIN asa_price_config
+      ON asa_vendor_config.asa_id = asa_price_config.asa_id
+      AND asa_vendor_config.entity_id = asa_price_config.entity_id
+    WHERE TRUE
+      AND asa_vendor_config.active_from < asa_price_config.active_to
+      AND asa_vendor_config.active_to > asa_price_config.active_from  
+  )
+
+  , final_table AS (
     SELECT *
-    -- create a PK to 
-    , SHA256(
-      CONCAT(
-        CAST(vendor_group_id AS STRING)
-        , CAST(priority AS STRING)
-        , CAST(deleted AS STRING)
-        -- take from https://stackoverflow.com/questions/49660672/what-to-try-to-get-bigquery-to-cast-bytes-to-string
-        , TO_BASE64(assigned_vendor_hash)
+      , SHA256(
+        CONCAT(
+          TO_BASE64(asa_id_vendor_hash)
+        , TO_BASE64(asa_price_config_hash)
         )
-    ) AS asa_id_vendor_hash
-    FROM generate_vendor_hash
+    ) as asa_id_config_hash
+    
+    FROM join_price_config
   )
 
   , get_past_version as (
     SELECT *
-      , LAG(asa_id_vendor_hash) OVER(asa_partition) AS previous_pk
-    FROM generate_pk_version
-    WINDOW asa_partition AS(PARTITION BY entity_id, asa_id ORDER BY active_from)
+      , LAG(asa_id_config_hash) OVER(PARTITION BY entity_id, asa_id ORDER BY active_from) as prev_hash
+    FROM final_table
   )
-  
-  , deduplicate_versions AS (
-    -- SELECT * EXCEPT(_row_number, next_pk, previous_pk, first_pk)
+
+  , deduplicate_versions as (
     SELECT *
-      , LEAD(active_from) OVER(PARTITION BY entity_id, asa_id ORDER BY active_from) as active_to
+      , LEAD(active_from) OVER(PARTITION BY entity_id, asa_id ORDER BY active_from) AS active_to 
     FROM get_past_version
     WHERE (
       CASE 
-        WHEN previous_pk IS NULL THEN TRUE --keep first version
-        WHEN ( asa_id_vendor_hash = previous_pk) THEN FALSE -- remove if current is equal to previous
+        WHEN prev_hash IS NULL THEN TRUE
+        WHEN asa_id_config_hash = prev_hash THEN FALSE
         ELSE TRUE
-        END
+      END
     )
   )
 
-  , get_vendor_group_config as (
-    SELECT DISTINCT global_entity_id as entity_id
-      , vendor_group_id
-      , vendor_filter
-      from `fulfillment-dwh-production.hl.dynamic_pricing_vendor_group`
+  , last_asa_assignment_version as (
+    SELECT 
+    entity_id
+    , asa_id
+    , active_to as last_active_to
+    FROM asa_vendor_config
+    QUALIFY ROW_NUMBER() OVER(partition by entity_id, asa_id ORDER BY active_from desc) = 1
+
   )
 
-  , remove_deleted AS (
-    SELECT dv.entity_id
+  , set_deleted_asa_timestamp as (
+    SELECT dv.* EXCEPT(active_to)
+    , LEAST(IFNULL(active_to,  "2099-01-01"),last_active_to) as active_to
+    FROM deduplicate_versions dv
+    LEFT JOIN last_asa_assignment_version lv
+      ON dv.entity_id = lv.entity_id
+      AND dv.asa_id = lv.asa_id
+
+  )
+
+  , asa_full_config as (
+      SELECT entity_id
       , country_code
       , asa_id
-      , asa_name
-      , asa_id_vendor_hash
-      , dv.vendor_group_id
-      , parse_vendor_filter(vendor_filter) as vendor_filters
-      , priority
       , active_from
-      , active_to
-      , assigned_vendor_hash
+      , IF(active_to = "2099-01-01", NULL, active_to) as active_to
+      , asa_name
+      , priority
+      , vendor_group_id
       , assigned_vendors_count
+      , n_schemes
+      , vendor_filters
+      , STRUCT(asa_id_config_hash
+        , asa_id_vendor_hash
+        , asa_price_config_hash
+        , assigned_vendor_hash
+      ) as asa_hashes
+      , asa_condition_mechanisms
+      , asa_price_config
       , sorted_assigned_vendor_ids
-    FROM deduplicate_versions dv
-    LEFT JOIN get_vendor_group_config vgc
-      ON dv.entity_id = vgc.entity_id
-      AND dv.vendor_group_id = vgc.vendor_group_id
-    WHERE deleted = FALSE
+
+    FROM set_deleted_asa_timestamp
+
   )
 
   SELECT *
-  FROM remove_deleted;
+  FROM asa_full_config
+
+
+  CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing.dps_asa_full_config_versions` 
+  CLUSTER BY entity_id, asa_id
+  AS
+  WITH asa_vendor_config AS (
+    SELECT * EXCEPT(active_to)
+      , IFNULL(active_to, "2099-01-01") AS active_to
+    FROM `dh-logistics-product-ops.pricing.dps_asa_vendor_assignments`
+  )
+
+  , asa_price_config AS (
+    SELECT * EXCEPT(active_to)
+      , IFNULL(active_to, "2099-01-01") AS active_to
+    FROM `dh-logistics-product-ops.pricing.dps_asa_price_config_versions`
+  )
+
+  , join_price_config AS (
+    SELECT asa_vendor_config.* EXCEPT(active_from, active_to)
+    , asa_price_config.* EXCEPT(active_from, active_to, asa_id, entity_id, country_code)
+    , GREATEST(asa_vendor_config.active_from, asa_price_config.active_from) AS active_from
+    FROM asa_vendor_config 
+    LEFT JOIN asa_price_config
+      ON asa_vendor_config.asa_id = asa_price_config.asa_id
+      AND asa_vendor_config.entity_id = asa_price_config.entity_id
+    WHERE TRUE
+      AND asa_vendor_config.active_from < asa_price_config.active_to
+      AND asa_vendor_config.active_to > asa_price_config.active_from  
+  )
+
+  , final_table AS (
+    SELECT *
+      , SHA256(
+        CONCAT(
+          TO_BASE64(asa_id_vendor_hash)
+        , TO_BASE64(asa_price_config_hash)
+        )
+    ) as asa_id_config_hash
+    
+    FROM join_price_config
+  )
+
+  , get_past_version as (
+    SELECT *
+      , LAG(asa_id_config_hash) OVER(PARTITION BY entity_id, asa_id ORDER BY active_from) as prev_hash
+    FROM final_table
+  )
+
+  , deduplicate_versions as (
+    SELECT *
+      , LEAD(active_from) OVER(PARTITION BY entity_id, asa_id ORDER BY active_from) AS active_to 
+    FROM get_past_version
+    WHERE (
+      CASE 
+        WHEN prev_hash IS NULL THEN TRUE
+        WHEN asa_id_config_hash = prev_hash THEN FALSE
+        ELSE TRUE
+      END
+    )
+  )
+
+  , asa_full_config as (
+      SELECT entity_id
+      , asa_id
+      , active_from
+      , active_to
+      , asa_name
+      , priority
+      , vendor_group_id
+      , assigned_vendors_count
+      , n_schemes
+      , vendor_filters
+      , STRUCT(asa_id_config_hash
+        , asa_id_vendor_hash
+        , asa_price_config_hash
+        , assigned_vendor_hash
+      ) as asa_hashes
+      , asa_condition_mechanisms
+      , asa_price_config
+      , sorted_assigned_vendor_ids
+
+    FROM deduplicate_versions
+  )
+
+  SELECT *
+  FROM asa_full_config;
