@@ -8,18 +8,29 @@ vendors as (
     v.vendor_name,
     -- st_geogpoint(v.location.longitude, v.location.latitude) vendor_location,
   ## how can we make the exception handling more scalable for more countries?
-    ('FastFood-AR' in unnest(v2.tags) 
+    CASE global_entity_id 
+    when 'PY_AR' then (
+     'FastFood-AR' in unnest(v2.tags) 
       or v.vendor_id in ('190757', '191419', '191412', '191411', '191408', '191439', '311004', '391493')
       or v.vendor_id in ('388770', '389866', '389505')
-      or 'Concepts-Ar' in unnest(v2.tags)
-    ) as exception,
+      or 'Concepts-Ar' in unnest(v2.tags))
+    when 'AP_PA' then ( 
+      'no-dbdf-group-4' in unnest(v2.tags)
+      or 'no-dbdf-group-3' in unnest(v2.tags))
+    when 'PY_EC' then ( 
+      'EC_High_Commission_Food_Feb' in unnest(v2.tags))
+    when 'PY_BO' then ( 
+      'CONCEPTS_BO_SCZ_FEB' in unnest(v2.tags)
+      or 'CONCEPTS_BO_NOTSCZ_FEB' in unnest(v2.tags))
+     end as exception,
     date(v.activation_date_local) between current_date() - 29 and current_date - 2 as new_vendor,
   from `fulfillment-dwh-production.curated_data_shared_central_dwh.vendors` v
   left join `fulfillment-dwh-production.cl.vendors_v2` v2 
-    on v.global_entity_id = v2.entity_id and v.vendor_id = v2.vendor_code
+  on v.global_entity_id = v2.entity_id and v.vendor_id = v2.vendor_code 
   where true
     and v.vertical_type = 'restaurants'
-    and v.global_entity_id = 'PY_AR'
+    and v.global_entity_id in ('PY_AR', 'AP_PA', 'PY_UY', 'PY_BO', 'PY_CL', 'PY_EC', 'PY_PY', 'PY_PE', 'PY_VE', 'PY_GT',
+    'PY_CR', 'PY_SV', 'PY_HN', 'PY_NI', 'PY_DO')
     and v.is_online
 )
 ,
@@ -38,7 +49,8 @@ orders as (
   from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_orders_v2` o
   where true
     and o.created_date between current_date() - 29 and current_date() - 2
-    and o.entity_id = 'PY_AR'
+    --and o.entity_id = 'PY_AR'
+    and o.region = 'Americas'
     and o.is_sent
     and o.is_own_delivery
   ## remove the subscribed orders?
@@ -48,20 +60,22 @@ orders as (
 )
 ,
 grouped_city as (
-  select 
+  select
+    entity_id,
     city_name,
     case
-      when order_share >= 0.2 or sum(order_share) over (order by order_share desc) <= 0.8 then city_name
+      when order_share >= 0.2 or sum(order_share) over (partition by entity_id order by order_share desc) <= 0.8 then city_name
       else 'Other'
     end city_grouped,
   from (
   select
+    entity_id,
     city_name,
-    sum(count(*)) over (partition by city_name) / sum(count(*)) over () order_share
+    sum(count(*)) over (partition by entity_id, city_name) / sum(count(*)) over (partition by entity_id) order_share
   from orders
-  group by 1
+  group by 1,2
   )
-  order by order_share desc
+  order by entity_id, order_share desc
 )
 ,
  aggregated_kpis as (
@@ -82,10 +96,10 @@ grouped_city as (
       avg(other_incentives) avg_other_incentives,
       avg(cpo) avg_delivery_cost,
     from vendors
-    left join orders
+    left join orders o
       using (entity_id, vendor_id)
     left join grouped_city g
-      using (city_name)
+      using (city_name, entity_id)
     group by 1,2,3,4,5,6
 )
 ,
