@@ -12,17 +12,17 @@ SET DateIndicator = '2022-01-01';
 SET vertical = "food";
 
 
-    CREATE OR REPLACE EXTERNAL TABLE `dh-logistics-product-ops.pricing._tr_vale_vendor_commission_list`
-        (
-        vendor_id STRING,
-        commission_rate FLOAT64
-        )
-        OPTIONS (
-        format="GOOGLE_SHEETS",
-        uris=["https://docs.google.com/spreadsheets/d/12BPyxw-Tfe7ndiHXW87oHsr86ZjVmPbaKbEUBu7LoOI/edit#gid=1206800966"],
-        sheet_range="Sheet2!A1:B22408",
-        skip_leading_rows=1
-    );
+    -- CREATE OR REPLACE EXTERNAL TABLE `dh-logistics-product-ops.pricing._tr_vale_vendor_commission_list`
+    --     (
+    --     vendor_id STRING,
+    --     commission_rate FLOAT64
+    --     )
+    --     OPTIONS (
+    --     format="GOOGLE_SHEETS",
+    --     uris=["https://docs.google.com/spreadsheets/d/12BPyxw-Tfe7ndiHXW87oHsr86ZjVmPbaKbEUBu7LoOI/edit#gid=1206800966"],
+    --     sheet_range="Sheet2!A1:B22408",
+    --     skip_leading_rows=1
+    -- );
 
 
     CREATE OR REPLACE TEMP TABLE pre_staging_orders AS  
@@ -53,6 +53,7 @@ SET vertical = "food";
         map.test_name, 
         map.variant,
         map.order_id,
+        zone_name,
         vertical_type,
         platform_order_code,
         delivery_fee_local,
@@ -61,6 +62,8 @@ SET vertical = "food";
         map.dps_minimum_order_value_local,
         map.gfv_local,
         map.gfv_eur,
+        case when order_delay_mins >=5  then order_id else NULL end order_delayed_5,
+        case when order_delay_mins >= 10 then order_id ELSE NULL end order_delayed_10,
         CASE
             WHEN map.commission_local IS NULL THEN gfv_local * cm.commission_percentage
             WHEN map.commission_local = 0 THEN gfv_local * cm.commission_percentage
@@ -84,6 +87,7 @@ SET vertical = "food";
         WHERE 1=1
         AND country_code = CtryCode
         AND variant NOT IN ('Original') 
+        AND zone_name IS NOT NULL
         AND variant IS NOT NULL
         AND map.created_date >=  DateIndicator
         AND test_name NOT LIKE "%miscon%"
@@ -133,6 +137,7 @@ SET vertical = "food";
         test_name
         , variant
         , target_group
+        , zone_name
         , COUNT(DISTINCT platform_order_code) AS Order_qty
         , COUNT(DISTINCT CASE WHEN vendor_price_scheme_type = "Campaign" then platform_order_code end) as Campaign_Orders
         , COUNT(DISTINCT CASE WHEN dps_delivery_fee_local = 0 then platform_order_code end) as Free_Delivery_Orders
@@ -150,8 +155,38 @@ SET vertical = "food";
         , SUM(mean_delay) AS mean_delay
         , SUM(service_fee_local) as service_fee_local
         , MAX(created_date) AS created_date
+        , count(distinct order_delayed_5) order_delayed_5
+        , count(distinct order_delayed_10) order_delayed_10
         FROM pre_staging_orders
-        group by 1,2,3
+        group by 1,2,3,4
+        UNION ALL
+        
+        SELECT
+        test_name
+        , variant
+        , target_group
+        , "All" as zone_name
+        , COUNT(DISTINCT platform_order_code) AS Order_qty
+        , COUNT(DISTINCT CASE WHEN vendor_price_scheme_type = "Campaign" then platform_order_code end) as Campaign_Orders
+        , COUNT(DISTINCT CASE WHEN dps_delivery_fee_local = 0 then platform_order_code end) as Free_Delivery_Orders
+        , SUM(delivery_fee_local) AS delivery_fee_local
+        , SUM(dps_delivery_fee_local) AS dps_delivery_fee_local
+        , SUM(dps_surge_fee_local) AS dps_surge_fee_local
+        , SUM(dps_minimum_order_value_local) AS dps_minimum_order_value_local
+        , SUM(gfv_local) AS gfv_local
+        , SUM(gfv_eur) AS gfv_eur
+        , SUM(commission_local) AS commission_local
+        , SUM(delivery_costs_local) AS delivery_costs_local
+        , SUM(to_customer_time) AS to_customer_time
+        , SUM(travel_time) AS travel_time
+        , SUM(delivery_distance) AS delivery_distance
+        , SUM(mean_delay) AS mean_delay
+        , SUM(service_fee_local) as service_fee_local
+        , MAX(created_date) AS created_date
+        , sum(order_delayed_5) order_delayed_5
+        , sum(order_delayed_10) order_delayed_10
+        FROM pre_staging_orders
+        group by 1,2,3,4
     )
 
     , treatment_level_kpi as (
@@ -159,6 +194,7 @@ SET vertical = "food";
         test_name
         , variant
         , "Treatment" as target_group
+        , zone_name
         , sum(Order_qty) Order_qty
         , sum(Campaign_Orders) Campaign_Orders
         , sum(Free_Delivery_Orders) Free_Delivery_Orders
@@ -176,10 +212,12 @@ SET vertical = "food";
         , SUM(mean_delay) AS mean_delay
         , SUM(service_fee_local) as service_fee_local
         , MAX(created_date) AS created_date
+        , sum(order_delayed_5) order_delayed_5
+        , sum(order_delayed_10) order_delayed_10
 
         from orders
         where target_group is not null
-        group by 1,2,3
+        group by 1,2,3,4
     )
 
     , all_level_metric as (
@@ -187,6 +225,7 @@ SET vertical = "food";
         test_name
         , variant
         , "All" as target_group
+        , zone_name
         , sum(Order_qty) Order_qty
         , sum(Campaign_Orders) Campaign_Orders
         , sum(Free_Delivery_Orders) Free_Delivery_Orders
@@ -204,9 +243,11 @@ SET vertical = "food";
         , SUM(mean_delay) AS mean_delay
         , SUM(service_fee_local) as service_fee_local
         , MAX(created_date) AS created_date
+        , sum(order_delayed_5) order_delayed_5
+        , sum(order_delayed_10) order_delayed_10
 
         from orders
-        group by 1,2,3
+        group by 1,2,3,4
     )
 
     , join_order_metrics as (
@@ -235,104 +276,152 @@ SET vertical = "food";
     )
 
 
-    , users AS (
+     --------- USER METRICS
+
+    , load_cvr as (
         SELECT 
         test_name
+        , _level
         , variant
+        , treatment
         , target_group
-        , SUM(session_id_count) AS total_sessions
-        , SUM(users_count_per_test) AS Distinct_users
-        , SUM(transaction_no_count) AS transaction_no_count
-        , SUM(list_menu_count) AS list_menu_count
-        , SUM(shop_list_no_count) as shop_list_no_count
-        , sum(shop_menu_no_count) as shop_menu_no_count
-        , SUM(menu_checkout_count) AS menu_checkout_count
-        , sum(checkout_no_count) as checkout_no_count
-        , SUM(checkout_transaction_count) AS checkout_transaction_count
-        , MIN(created_date) AS min_date
-        , MAX(created_date) AS max_date
-
-
+        , session_id_count
+        , users_count_per_test
+        , transaction_no_count
+        , list_menu_count
+        , shop_list_no_count
+        , shop_menu_no_count
+        , menu_checkout_count
+        , checkout_no_count
+        , checkout_transaction_count
+        , created_date
         FROM `fulfillment-dwh-production.rl.dps_ab_test_dashboard_cvr_v2`
         WHERE 1=1
-        AND country_code = CtryCode
+        and country_code = CtryCode
+        AND created_date >= DateIndicator
         AND variant NOT IN ('Original')
         AND variant IS NOT NULL
-        AND target_group IS NOT NULL 
-        AND test_name NOT LIKE "%iscon%"
-        AND created_date >= DateIndicator
-        GROUP BY 1,2,3
+               
     )
 
-    , users_treatment_level as (
-
-
-        SELECT 
-        test_name
-        , variant
-        , "Treatment" as target_group
-        , SUM(total_sessions) AS total_sessions
-        , SUM(Distinct_users) AS Distinct_users
-        , SUM(transaction_no_count) AS transaction_no_count
-        , SUM(list_menu_count) AS list_menu_count
-        , SUM(shop_list_no_count) as shop_list_no_count
-        , sum(shop_menu_no_count) as shop_menu_no_count
-        , SUM(menu_checkout_count) AS menu_checkout_count
-        , sum(checkout_no_count) as checkout_no_count
-        , SUM(checkout_transaction_count) AS checkout_transaction_count
-        , MIN(min_date) AS min_date
-        , MAX(max_date) AS max_date
-
-        from users
-        where target_group <> "All"
-        GROUP BY 1,2,3
-    )
-
-    , correct_user_distinct_users as (
-        select
-        test_name
-        , variant 
-        , Distinct_users
-
-        from users
-        where target_group = "All"
+    , user_all_level as (
+            select 
+            test_name
+            , variant
+            , target_group
+            , SUM(session_id_count) AS total_sessions
+            , SUM(transaction_no_count) AS transaction_no_count
+            , SUM(list_menu_count) AS list_menu_count
+            , SUM(shop_list_no_count) as shop_list_no_count
+            , sum(shop_menu_no_count) as shop_menu_no_count
+            , SUM(menu_checkout_count) AS menu_checkout_count
+            , sum(checkout_no_count) as checkout_no_count
+            , SUM(checkout_transaction_count) AS checkout_transaction_count
+            , MIN(created_date) AS min_date
+            , MAX(created_date) AS max_date
+            FROM load_cvr
+            WHERE target_group = "All"
+            AND treatment = "All" 
+            GROUP BY 1,2,3
 
     )
 
-    , union_user_metrics as (
-        (
-            select
-            *
-            from users
-        )
+    , user_all_treatment as (
+            select 
+            test_name
+            , variant
+            , "Treatment" as target_group
+            , SUM(session_id_count) AS total_sessions
+            , SUM(transaction_no_count) AS transaction_no_count
+            , SUM(list_menu_count) AS list_menu_count
+            , SUM(shop_list_no_count) as shop_list_no_count
+            , sum(shop_menu_no_count) as shop_menu_no_count
+            , SUM(menu_checkout_count) AS menu_checkout_count
+            , sum(checkout_no_count) as checkout_no_count
+            , SUM(checkout_transaction_count) AS checkout_transaction_count
+            , MIN(created_date) AS min_date
+            , MAX(created_date) AS max_date
+            FROM load_cvr
+            WHERE target_group = "All"
+            AND treatment = "True" 
+            GROUP BY 1,2,3
+    )
 
-        UNION ALL
-        (
-            select
-            *
-            from users_treatment_level
-        )
+    , user_target_group as (
+            select 
+            test_name
+            , variant
+            , target_group
+            , SUM(session_id_count) AS total_sessions
+            , SUM(transaction_no_count) AS transaction_no_count
+            , SUM(list_menu_count) AS list_menu_count
+            , SUM(shop_list_no_count) as shop_list_no_count
+            , sum(shop_menu_no_count) as shop_menu_no_count
+            , SUM(menu_checkout_count) AS menu_checkout_count
+            , sum(checkout_no_count) as checkout_no_count
+            , SUM(checkout_transaction_count) AS checkout_transaction_count
+            , MIN(created_date) AS min_date
+            , MAX(created_date) AS max_date
+            FROM load_cvr
+            WHERE target_group <> "All"
+            AND treatment = "All" 
+            GROUP BY 1,2,3
+    )
+
+    , get_distinct_users as (
+            select 
+            test_name
+            , variant
+            , SUM(users_count_per_test) AS Distinct_users
+            FROM load_cvr
+            WHERE target_group = "All"
+            AND treatment = "All" 
+            GROUP BY 1,2
+    )
+
+, union_cvrs as (
+
+        SELECT *
+        FROM user_all_level
+
+        UNION ALL 
+
+        SELECT *
+        FROM user_all_treatment
+
+        UNION ALL 
+
+        SELECT *
+        FROM user_target_group
+
+)
+
+    , add_distinct_users as (
+
+            SELECT a.*
+            , b.Distinct_users
+            FROM union_cvrs a
+            LEFT JOIN get_distinct_users b
+                    USING(test_name, variant)
     )
 
     , join_users_to_orders as (
         select
         o.*
-        , s.* except(test_name, variant, target_group, Distinct_users)
-        , d.Distinct_users
+        , s.* except(test_name, variant, target_group)
         from join_order_metrics o
-        LEFT JOIN  union_user_metrics s
+        LEFT JOIN  add_distinct_users s
             using(test_name, variant, target_group)
-        LEFT JOIN correct_user_distinct_users d
-            using(test_name, variant)
 
     )
 
     , calculate_avg_metrics as (
         select
-        concat(test_name, variant, target_group) as code
+        concat(test_name, variant, target_group, zone_name) as code
         ,  test_name
         ,  variant
         ,  target_group
+        ,  zone_name
         ,  Order_qty as Orders
         ,  Campaign_Orders
         ,  SAFE_DIVIDE(Free_Delivery_Orders, Order_qty) as Free_Delivery_Share
@@ -412,7 +501,7 @@ SET vertical = "food";
     SELECT 
     test_name, 
     variant_b, 
-    treatment,kpi_label, 
+    treatment,"All" as zone_name, kpi_label, 
     p_value 
     FROM  `fulfillment-dwh-production.rl.dps_ab_test_significance_dataset_v2`
     WHERE variant_a = 'Control'
@@ -465,6 +554,7 @@ SET vertical = "food";
       ON a.variant = b.variant_b
       AND a.test_name = b.test_name
       AND a.target_group = b.treatment_1
+      AND a.zone_name = b.zone_name
     )
 
 
@@ -479,13 +569,12 @@ SET vertical = "food";
         '''
         CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing._'''|| upper(CtryCode) ||'''_AB_Results_Orders_'''|| vertical ||'''`
         AS
-        SELECT
+        SELECT distinct
         *
         FROM staging_orders
         '''
     );
 
--- END
 
 
 
@@ -542,7 +631,6 @@ with user_in_test as (
     AND order_placed_at BETWEEN timestamp_log_minute AND test_end_date
   INNER JOIN load_vendors v
     ON dps.vendor_id = v.vendor_id
-  GROUP BY 1,2,3
-)
+  GROUP BY 1,2,3)
 
 SELECT * FROM od_share_per_test ORDER BY 1,2
