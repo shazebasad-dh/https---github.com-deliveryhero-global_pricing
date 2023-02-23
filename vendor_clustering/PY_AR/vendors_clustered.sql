@@ -125,6 +125,7 @@ select
     when avg_basket_normalized <= 0 and avg_distance_normalized >= 0 then 'Low basket, high distance'
     when avg_basket_normalized >= 0 and avg_distance_normalized <= 0 then 'High basket, low distance'
     when avg_basket_normalized <= 0 and avg_distance_normalized <= 0 then 'Low basket, low distance'
+    else 'Not defined'
   end as cluster,
   -- case
   --   when exception then 'Exception'
@@ -136,6 +137,7 @@ select
   --   when abs(p_avg_basket) <= 0.5 and abs(p_avg_distance) >= 0.5 then 'Low basket, high distance'
   --   when abs(p_avg_basket) >= 0.5 and abs(p_avg_distance) <= 0.5 then 'High basket, low distance'
   --   when abs(p_avg_basket) <= 0.5 and abs(p_avg_distance) <= 0.5 then 'Low basket, low distance'
+  --   else 'Not defined'
   -- end as cluster_2,
 from normalized_kpis
 order by cluster asc
