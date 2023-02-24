@@ -78,31 +78,52 @@ grouped_city as (
   order by entity_id, order_share desc
 )
 ,
+competition as (
+  select distinct
+    pt.entity_id,
+    cast(partner_id as string) vendor_id,
+  from `peya-bi-tools-pro.il_scraping.dim_competitor_historical` c
+  left join `peya-bi-tools-pro.il_core.dim_partner` p
+    on c.peya_partner_id = p.partner_id and c.country = p.country.country_name
+  left join `fulfillment-dwh-production.cl.countries` cn
+    on lower(p.country.country_code) = lower(cn.country_code)
+  left join unnest(platforms) pt
+  where pt.entity_id in ('PY_AR', 'AP_PA', 'PY_UY', 'PY_BO', 'PY_CL', 'PY_EC', 'PY_PY', 'PY_PE', 'PY_VE', 'PY_GT', 'PY_CR', 'PY_SV', 'PY_HN', 'PY_NI', 'PY_DO')
+    and c.date between current_date() - 29 and current_date() - 2
+    -- and c.peya_partner_id is not null
+    and (rappi_partner_id is not null
+      or ubereats_partner_id is not null)
+  group by 1,2
+)
+,
  aggregated_kpis as (
-    select
-      entity_id,
-      vendor_id,
-      vendor_name,
-      longitude,
-      latitude,
-      g.city_grouped city_name,
-      exception,
-      new_vendor,
-      count(*) < 10 insufficient_data,
-      count(*) orders,
-      avg(gbv) avg_basket,
-      avg(linear_dist_customer_vendor) avg_distance,
-      avg(cf) avg_cf,
-      avg(vf) avg_vf,
-      avg(dh_incentives) avg_dh_incentives,
-      avg(other_incentives) avg_other_incentives,
-      avg(cpo) avg_delivery_cost,
-    from vendors
-    left join orders o
-      using (entity_id, vendor_id)
-    left join grouped_city g
-      using (city_name, entity_id)
-    group by 1,2,3,4,5,6,7,8
+  select
+    entity_id,
+    vendor_id,
+    vendor_name,
+    longitude,
+    latitude,
+    g.city_grouped city_name,
+    exception,
+    new_vendor,
+    competition.vendor_id is not null is_mult_platform,
+    count(*) < 10 insufficient_data,
+    count(*) orders,
+    avg(gbv) avg_basket,
+    avg(linear_dist_customer_vendor) avg_distance,
+    avg(cf) avg_cf,
+    avg(vf) avg_vf,
+    avg(dh_incentives) avg_dh_incentives,
+    avg(other_incentives) avg_other_incentives,
+    avg(cpo) avg_delivery_cost,
+  from vendors
+  left join competition
+    using (entity_id, vendor_id)
+  left join orders o
+    using (entity_id, vendor_id)
+  left join grouped_city g
+    using (city_name, entity_id)
+  group by 1,2,3,4,5,6,7,8,9
 )
 ,
 normalized_kpis as (
