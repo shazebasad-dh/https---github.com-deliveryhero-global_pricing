@@ -88,7 +88,7 @@ competition as (
   left join `fulfillment-dwh-production.cl.countries` cn
     on lower(p.country.country_code) = lower(cn.country_code)
   left join unnest(platforms) pt
-  where pt.entity_id in ('PY_AR', 'AP_PA', 'PY_UY', 'PY_BO', 'PY_CL', 'PY_EC', 'PY_PY', 'PY_PE', 'PY_VE', 'PY_GT', 'PY_CR', 'PY_SV', 'PY_HN', 'PY_NI', 'PY_DO')
+  where pt.is_active
     and c.date between current_date() - 29 and current_date() - 2
     -- and c.peya_partner_id is not null
     and (rappi_partner_id is not null
