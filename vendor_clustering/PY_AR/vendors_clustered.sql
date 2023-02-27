@@ -79,20 +79,21 @@ grouped_city as (
 )
 ,
 competition as (
-  select distinct
+select 
+distinct
     pt.entity_id,
     cast(partner_id as string) vendor_id,
-  from `peya-bi-tools-pro.il_scraping.dim_competitor_historical` c
-  left join `peya-bi-tools-pro.il_core.dim_partner` p
+    (min(rappi_partner_id) is not null
+    or min(ubereats_partner_id) is not null) as competed,
+  from  `peya-bi-tools-pro.il_core.dim_partner` p
+  left join `peya-bi-tools-pro.il_scraping.dim_competitor_historical` c
     on c.peya_partner_id = p.partner_id and c.country = p.country.country_name
   left join `fulfillment-dwh-production.cl.countries` cn
     on lower(p.country.country_code) = lower(cn.country_code)
   left join unnest(platforms) pt
   where pt.is_active
     and c.date between current_date() - 29 and current_date() - 2
-    -- and c.peya_partner_id is not null
-    and (rappi_partner_id is not null
-      or ubereats_partner_id is not null)
+    --and (c.peya_partner_id is not null
   group by 1,2
 )
 ,
@@ -106,7 +107,7 @@ competition as (
     g.city_grouped city_name,
     exception,
     new_vendor,
-    competition.vendor_id is not null is_mult_platform,
+    competed,
     count(*) < 10 insufficient_data,
     count(*) orders,
     avg(gbv) avg_basket,
@@ -138,6 +139,7 @@ normalized_kpis as (
   from aggregated_kpis
 )
 select
+distinct
   *,
   case
     when exception then 'Exception'
