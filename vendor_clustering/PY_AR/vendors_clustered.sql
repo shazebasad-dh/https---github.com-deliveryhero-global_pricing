@@ -1,7 +1,19 @@
-## split into intermediate tables
 ## create a DAG to orchestrate the update: https://github.com/omar-elmaria/airflow_at_delivery_hero
-## get LB and ASA id from `dh-logistics-product-ops.pricing.final_vendor_list_all_data_loved_brands_scaled_code`
-## add other entities to the query
+create or replace table `dh-logistics-product-ops.pricing.clustering_caps` as
+select
+  o.entity_id,
+  avg(o.gfv_eur) avg_gfv_eur,
+  stddev_pop(o.gfv_eur) stddev_pop_gfv_eur,
+  avg(o.linear_dist_customer_vendor) avg_linear_dist_customer_vendor,
+  stddev_pop(o.linear_dist_customer_vendor) stddev_pop_linear_dist_customer_vendor,
+from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_orders_v2` o
+where true
+  and o.created_date between current_date() - 29 and current_date() - 2
+  and o.is_sent
+  and o.is_own_delivery
+  and o.vertical_type = 'restaurants'
+group by 1
+;
 create or replace table `dh-logistics-product-ops.pricing.clustering_orders` as
 select
   o.entity_id,
@@ -15,17 +27,21 @@ select
   ifnull(o.voucher_other_eur,0) + ifnull(o.discount_other_eur,0) other_incentives,
   ifnull(o.delivery_costs_eur,0) cpo,
 from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_orders_v2` o
+left join  `dh-logistics-product-ops.pricing.clustering_caps` c
+  using (entity_id)
 where true
+## to-do: remove the subscribed orders
+## to-do: remove orders from new customers
   and o.created_date between current_date() - 29 and current_date() - 2
-  --and o.entity_id = 'PY_AR'
-  -- and o.region = 'Americas'
   and o.is_sent
   and o.is_own_delivery
+  and o.vertical_type = 'restaurants'
+  # remove outliers (>= 5 std deviations above the median)
+  and o.gfv_eur < avg_gfv_eur + 5 * stddev_pop_gfv_eur
+  and o.linear_dist_customer_vendor < avg_linear_dist_customer_vendor + 5 * stddev_pop_linear_dist_customer_vendor
+  -- and o.region = 'Americas'
+  -- and o.entity_id = 'PY_AR'
   -- and o.vendor_id = '144883'
-## to-do: remove the subscribed orders
-## check if we should remove outliers (>= 5 std deviations above the median?), but this is currently breaking the memory limit
--- qualify o.gfv_eur < percentile_cont(o.gfv_eur, 0.5) over (partition by o.entity_id) + 5 * stddev_pop(o.gfv_eur) over (partition by o.entity_id)
--- and o.linear_dist_customer_vendor < percentile_cont(o.linear_dist_customer_vendor, 0.5) over (partition by o.entity_id) + 5 * stddev_pop(o.linear_dist_customer_vendor) over (partition by o.entity_id)
 ;
 ## to-do: when one city has more than 50% of the total orders, segment it by blocks of zones
 create or replace table `dh-logistics-product-ops.pricing.clustering_areas` as
@@ -76,7 +92,7 @@ vendors as (
     v.vendor_name,
     v.location.longitude,
     v.location.latitude,
-  ## how can we make the exception handling more scalable for more countries?
+  ## to-do: make the exception handling more scalable
     case global_entity_id 
     when 'PY_AR' then (
      'FastFood-AR' in unnest(v2.tags) 
@@ -106,12 +122,10 @@ vendors as (
 )
 ,
 competition as (
-select 
-distinct
+select
     pt.entity_id,
     cast(partner_id as string) vendor_id,
-    (min(rappi_partner_id) is not null
-    or min(ubereats_partner_id) is not null) as is_competed,
+    min(rappi_partner_id) is not null or min(ubereats_partner_id) is not null as is_competed,
   from  `peya-bi-tools-pro.il_core.dim_partner` p
   left join `peya-bi-tools-pro.il_scraping.dim_competitor_historical` c
     on c.peya_partner_id = p.partner_id and c.country = p.country.country_name
@@ -120,7 +134,6 @@ distinct
   left join unnest(platforms) pt
   where pt.is_active
     and c.date between current_date() - 29 and current_date() - 2
-    --and (c.peya_partner_id is not null
   group by 1,2
 )
 ,
