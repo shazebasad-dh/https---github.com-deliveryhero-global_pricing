@@ -198,18 +198,16 @@ vendors as (
 ,
 competition as (
   select
-    pt.entity_id,
+    cn.global_entity_id entity_id,
     cast(partner_id as string) vendor_id,
     min(rappi_partner_id) is not null or min(ubereats_partner_id) is not null as is_competed,
   from  `peya-bi-tools-pro.il_core.dim_partner` p
   left join `peya-bi-tools-pro.il_scraping.dim_competitor_historical` c
     on c.peya_partner_id = p.partner_id 
       and c.country = p.country.country_name
-  left join `fulfillment-dwh-production.cl.countries` cn
+  left join `fulfillment-dwh-production.dl.dynamic_pricing_global_configuration` cn
     on lower(p.country.country_code) = lower(cn.country_code)
-  left join unnest(platforms) pt
-  where pt.is_active
-    and c.date between current_date() - 29 and current_date() - 2
+  where c.date between current_date() - 29 and current_date() - 2
   group by 1,2
 )
 ,
@@ -220,7 +218,7 @@ asa_lb as (
     asa_id,
     master_asa_id,
     asa_name,
-    case is_lb when 'Y' then true when 'N' then false else null end is_lb,
+    case is_lb_lm when 'Y' then true when 'N' then false else null end is_lb,
     cvr3,
     vendor_cvr3_slope,
     asa_cvr3_slope,
