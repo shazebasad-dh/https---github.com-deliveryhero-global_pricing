@@ -44,57 +44,110 @@ where true
   -- and o.entity_id = 'PY_AR'
   -- and o.vendor_id = '144883'
 ;
-# when one city has more than 50% of the total orders, segment it by zone; 
-create or replace table `dh-logistics-product-ops.pricing.clustering_areas` as
+create or replace table `dh-logistics-product-ops.pricing.clustering_vendor_areas` as
 with
-vendor_area as (
-  select
-    entity_id,
-    vendor_id,
-    min(city_name) over (partition by entity_id, vendor_id order by orders desc) as city_name,
-    min(zone_name) over (partition by entity_id, vendor_id order by orders desc) as zone_name,
-    orders,
-  from (
-    select
-      entity_id,
-      vendor_id,
-      city_name,
-      zone_name,
-      count(*) orders,
-    from `dh-logistics-product-ops.pricing.clustering_orders`
-    -- where entity_id = 'AP_PA'
-    group by 1,2,3,4
-  )
-)
-,
-areas as (
+total_orders as (
   select
     entity_id,
     city_name,
     zone_name,
-    sum(sum(orders)) over (partition by entity_id, city_name) / sum(sum(orders)) over (partition by entity_id) city_order_share,
-    sum(sum(orders)) over (partition by entity_id, city_name, zone_name) / sum(sum(orders)) over (partition by entity_id, city_name) zone_order_share,
-  from vendor_area
+    vendor_id,
+    count(*) orders,
+  from `dh-logistics-product-ops.pricing.clustering_orders`
+  group by 1,2,3,4
+)
+,
+most_frequent_area as (
+  select
+    entity_id,
+    vendor_id,
+    orders,
+    ifnull(nth_value(city_name, 1 ignore nulls) over a, lead(city_name, 1) over a) as city_name,
+    ifnull(nth_value(zone_name, 1 ignore nulls) over a, lead(zone_name, 1) over a) as zone_name,
+  from total_orders
+  -- where vendor_id = '332154'
+  -- and entity_id = 'PY_CL'
+  window a as (partition by entity_id, vendor_id order by orders desc)
+)
+select
+  entity_id,
+  city_name,
+  zone_name,
+  vendor_id,
+  sum(orders) vendor_orders,
+from most_frequent_area
+group by 1,2,3,4
+;
+create or replace table `dh-logistics-product-ops.pricing.clustering_areas` as
+with
+zone_metrics as (
+  select
+    entity_id,
+    city_name,
+    zone_name,
+    sum(vendor_orders) zone_orders,
+    sum(sum(vendor_orders)) over a city_orders,
+    sum(sum(vendor_orders)) over b entity_orders,
+    sum(vendor_orders) / sum(sum(vendor_orders)) over a zone_share_city,
+    sum(sum(vendor_orders)) over a / sum(sum(vendor_orders)) over b city_share_entity,
+    sum(vendor_orders) / sum(sum(vendor_orders)) over b zone_share_entity,
+  from `dh-logistics-product-ops.pricing.clustering_vendor_areas`
   group by 1,2,3
+  window
+    a as (partition by entity_id, city_name),
+    b as (partition by entity_id)
+  order by 1,4 desc
+)
+,
+city_share as (
+  select
+    entity_id,
+    city_name,
+    city_share_entity city_order_share,
+    sum(zone_orders) city_orders,
+    sum(min(city_share_entity)) over a city_order_share_cum,
+  from zone_metrics
+  group by 1,2,3
+  window a as (partition by entity_id order by city_share_entity desc)
+)
+,
+area_share as (
+  select
+    entity_id,
+    city_name,
+    city_order_share,
+    city_order_share_cum,
+    zone_name,
+    zone_share_city zone_order_share,
+    sum(zone_orders) zone_orders,
+    sum(min(zone_share_city)) over a zone_order_share_cum,
+  from zone_metrics
+  left join city_share using (entity_id, city_name)
+  group by 1,2,3,4,5,6
+  window a as (partition by entity_id, city_name order by zone_share_city desc)
+  order by city_order_share_cum, zone_order_share_cum
 )
 select
   entity_id,
   city_name,
   zone_name,
   case
-    when city_order_share > 0.5 and sum(zone_order_share) over (partition by entity_id, city_name order by zone_order_share desc) <= 0.8 then zone_name
+  # if the city represents more than 50% of the total orders, segment it by zone
+    when city_order_share > 0.5 and zone_order_share_cum < 0.8 then concat(zone_name, 'zone')
+    when city_order_share > 0.5 and zone_order_share between 0.2 and 0.8 then concat(zone_name, 'zone')
+  # otherwise, identify the major cities
     when city_order_share between 0.2 and 0.5 then city_name
-    when sum(city_order_share) over (partition by entity_id, city_name order by city_order_share desc) <= 0.8 then city_name
+    when city_order_share_cum <= 0.8 then city_name
+  # and group the smaller cities
     else 'Other'
   end area_grouped,
   -- city_order_share,
-  -- sum(city_order_share * zone_order_share) over (partition by entity_id order by city_order_share desc) running_sum_city_share,
+  -- city_order_share_cum,
   -- zone_order_share,
-  -- sum(city_order_share * zone_order_share) over (partition by entity_id order by zone_order_share desc) running_sum_zone_share,
-  -- sum(zone_order_share) over (partition by entity_id, city_name order by zone_order_share desc) running_sum_zone_share,
-  -- sum(zone_order_share) over (partition by entity_id order by zone_order_share desc) running_sum_zone_share,
-from areas
-order by entity_id, city_order_share * zone_order_share desc
+  -- zone_order_share_cum,
+  -- zone_orders,
+from area_share
+order by entity_id, city_order_share_cum, zone_order_share_cum
 ;
 create or replace table `dh-logistics-product-ops.pricing.clustering_vendors` as
 with
@@ -107,6 +160,8 @@ vendors as (
     v.vendor_name,
     v.location.longitude,
     v.location.latitude,
+    a.city_name,
+    a.zone_name,
   ## to-do: make the exception handling more scalable
     case global_entity_id 
     when 'PY_AR' then (
@@ -130,12 +185,15 @@ vendors as (
   left join `fulfillment-dwh-production.cl.vendors_v2` v2 
     on v.global_entity_id = v2.entity_id 
       and v.vendor_id = v2.vendor_code 
+  left join `dh-logistics-product-ops.pricing.clustering_vendor_areas` a
+    using (entity_id, vendor_id)
   where true
     and v.vertical_type = 'restaurants'
     -- and v.global_entity_id in ('PY_AR', 'AP_PA', 'PY_UY', 'PY_BO', 'PY_CL', 'PY_EC', 'PY_PY', 'PY_PE', 'PY_VE', 'PY_GT', 'PY_CR', 'PY_SV', 'PY_HN', 'PY_NI', 'PY_DO')
     and v.is_online
     and not v.is_test_vendor
     and g.is_reporting_enabled
+    -- and a.city_name = 'Bangkok'
 )
 ,
 competition as (
@@ -167,7 +225,8 @@ asa_lb as (
     vendor_cvr3_slope,
     asa_cvr3_slope,
   from `dh-logistics-product-ops.pricing.final_vendor_list_all_data_loved_brands_scaled_code`
-  qualify update_timestamp = max(update_timestamp) over (partition by entity_id)
+  qualify row_number() over a = 1
+  window a as (partition by entity_id, vendor_id order by update_timestamp desc)
 )
 select
   v.region,
@@ -179,6 +238,8 @@ select
   v.latitude,
   v.exception,
   v.new_vendor,
+  v.city_name,
+  v.zone_name,
   c.is_competed,
   a.* except (entity_id, vendor_id),
 from vendors v
@@ -191,35 +252,37 @@ create or replace table `dh-logistics-product-ops.pricing.vendors_clustered` as
 with
 aggregated_kpis as (
   select
-  v.*,
-  g.area_grouped area_name,
-  count(*) < 10 insufficient_data,
-  count(*) orders,
-  avg(o.gbv) avg_basket,
-  avg(o.linear_dist_customer_vendor) avg_distance,
-  avg(o.cf) avg_cf,
-  avg(o.vf) avg_vf,
-  avg(o.dh_incentives) avg_dh_incentives,
-  avg(o.other_incentives) avg_other_incentives,
-  avg(o.cpo) avg_delivery_cost,
-from `dh-logistics-product-ops.pricing.clustering_vendors` v
-left join `dh-logistics-product-ops.pricing.clustering_orders` o
-  using (entity_id, vendor_id)
-left join `dh-logistics-product-ops.pricing.clustering_areas` g
-  using (city_name, zone_name, entity_id)
-group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+    v.* except (city_name, zone_name),
+    g.area_grouped area_name,
+    count(*) < 10 insufficient_data,
+    count(*) orders,
+    avg(o.gbv) avg_basket,
+    avg(o.linear_dist_customer_vendor) avg_distance,
+    avg(o.cf) avg_cf,
+    avg(o.vf) avg_vf,
+    avg(o.dh_incentives) avg_dh_incentives,
+    avg(o.other_incentives) avg_other_incentives,
+    avg(o.cpo) avg_delivery_cost,
+  from `dh-logistics-product-ops.pricing.clustering_vendors` v
+  left join `dh-logistics-product-ops.pricing.clustering_areas` g
+    using (entity_id, city_name, zone_name)
+  left join `dh-logistics-product-ops.pricing.clustering_orders` o
+    using (entity_id, vendor_id)
+  group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
 )
 ,
 normalized_kpis as (
   select 
     *,
-    percent_rank() over (partition by entity_id, area_name, exception, new_vendor, insufficient_data order by avg_basket asc) p_avg_basket,
-    percent_rank() over (partition by entity_id, area_name, exception, new_vendor, insufficient_data order by avg_distance asc) p_avg_distance,
-    ((avg_basket - avg(avg_basket) over(partition by entity_id, area_name, exception, new_vendor, insufficient_data)) 
-      / nullif(stddev_pop(avg_basket) over (partition by entity_id, area_name, exception, new_vendor, insufficient_data), 0)) AS avg_basket_normalized,
-    ((avg_distance - avg(avg_distance) over(partition by entity_id, area_name, exception, new_vendor, insufficient_data)) 
-      / nullif(stddev_pop(avg_distance) over (partition by entity_id, area_name, exception, new_vendor, insufficient_data), 0)) AS avg_distance_normalized,
+    percent_rank() over a p_avg_basket,
+    percent_rank() over b p_avg_distance,
+    ((avg_basket - avg(avg_basket) over c) / nullif(stddev_pop(avg_basket) over c, 0)) AS avg_basket_normalized,
+    ((avg_distance - avg(avg_distance) over c) / nullif(stddev_pop(avg_distance) over c, 0)) AS avg_distance_normalized,
   from aggregated_kpis
+  window
+    a as (partition by entity_id, area_name, exception, new_vendor, insufficient_data order by avg_basket asc),
+    b as (partition by entity_id, area_name, exception, new_vendor, insufficient_data order by avg_distance asc),
+    c as (partition by entity_id, area_name, exception, new_vendor, insufficient_data)
 )
 select
   *,
@@ -235,16 +298,5 @@ select
     when avg_basket_normalized <= 0 and avg_distance_normalized <= 0 then 'Low basket, low distance'
     else 'Not defined'
   end as cluster,
-  -- case
-  --   when exception then 'Exception'
-  --   when new_vendor then 'New Vendor'
-  --   when insufficient_data then 'Insufficient data'
-  --   # fits 30% of the vendors from the median in the central cluster
-  --   when pow(pow(abs(p_avg_basket - 0.5), 2) + pow(abs(p_avg_distance - 0.5), 2), 0.5) < pow(pow(1, 2) * 0.3 / acos(-1), 0.5)  then  'Central cluster'
-  --   when abs(p_avg_basket) >= 0.5 and abs(p_avg_distance) >= 0.5 then 'High basket, high distance'
-  --   when abs(p_avg_basket) <= 0.5 and abs(p_avg_distance) >= 0.5 then 'Low basket, high distance'
-  --   when abs(p_avg_basket) >= 0.5 and abs(p_avg_distance) <= 0.5 then 'High basket, low distance'
-  --   when abs(p_avg_basket) <= 0.5 and abs(p_avg_distance) <= 0.5 then 'Low basket, low distance'
-  -- end as cluster_2,
 from normalized_kpis
 order by cluster asc
