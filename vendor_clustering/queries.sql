@@ -4,8 +4,10 @@ select
   o.entity_id,
   avg(o.gfv_eur) avg_gfv_eur,
   stddev_pop(o.gfv_eur) stddev_pop_gfv_eur,
-  avg(o.linear_dist_customer_vendor) avg_linear_dist_customer_vendor,
-  stddev_pop(o.linear_dist_customer_vendor) stddev_pop_linear_dist_customer_vendor,
+  -- avg(o.linear_dist_customer_vendor) avg_linear_dist_customer_vendor,
+  -- stddev_pop(o.linear_dist_customer_vendor) stddev_pop_linear_dist_customer_vendor,
+  avg(o.dps_travel_time) avg_dps_travel_time,
+  stddev_pop(o.dps_travel_time) stddev_pop_dps_travel_time,
 from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_orders_v2` o
 where true
   and o.created_date between current_date() - 29 and current_date() - 2
@@ -21,7 +23,9 @@ select
   o.city_name,
   o.zone_name,
   o.gfv_eur gbv,
-  o.linear_dist_customer_vendor,
+  -- o.linear_dist_customer_vendor,
+  o.dps_travel_time,
+  o.dps_travel_time_fee_local,
   ifnull(o.delivery_fee_eur,0) + ifnull(o.service_fee_eur,0) + ifnull(o.mov_customer_fee_eur,0) cf,
   ifnull(o.commission_eur,0) + ifnull(o.joker_vendor_fee_eur,0) vf,
   ifnull(o.voucher_dh_eur,0) + ifnull(o.discount_dh_eur,0) dh_incentives,
@@ -37,9 +41,12 @@ where true
   and o.is_sent
   and o.is_own_delivery
   and o.vertical_type = 'restaurants'
+  and o.variant in ('Original', 'Control')
+  and o.vendor_price_scheme_type in ('Experiment', 'Automatic scheme', 'Manual')
   # remove outliers (>= 5 std deviations above the median)
   and o.gfv_eur < avg_gfv_eur + 5 * stddev_pop_gfv_eur
-  and o.linear_dist_customer_vendor < avg_linear_dist_customer_vendor + 5 * stddev_pop_linear_dist_customer_vendor
+  and o.dps_travel_time < c.avg_dps_travel_time + 5 * c.stddev_pop_dps_travel_time
+  -- and o.linear_dist_customer_vendor < avg_linear_dist_customer_vendor + 5 * stddev_pop_linear_dist_customer_vendor  
   -- and o.region = 'Americas'
   -- and o.entity_id = 'PY_AR'
   -- and o.vendor_id = '144883'
@@ -255,7 +262,7 @@ aggregated_kpis as (
     count(*) < 10 insufficient_data,
     count(*) orders,
     avg(o.gbv) avg_basket,
-    avg(o.linear_dist_customer_vendor) avg_distance,
+    avg(o.dps_travel_time) avg_distance,
     avg(o.cf) avg_cf,
     avg(o.vf) avg_vf,
     avg(o.dh_incentives) avg_dh_incentives,
@@ -298,3 +305,52 @@ select
   end as cluster,
 from normalized_kpis
 order by cluster asc
+;
+create or replace table `dh-logistics-product-ops.pricing.clusters_travel_time_mapped` as
+with
+shares as (
+  select
+    cast([01,05,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90,95,99,100] as array<int64>) as share_per_tier, -- Cumulative shares selected
+)
+,
+tiers as (
+  select
+    cum_share,
+    row_number() over (order by cum_share) tier,
+    ifnull(lag(cum_share) over (order by cum_share),0) lower_tt_percentile,
+    cum_share upper_tt_percentile,
+from shares, unnest(share_per_tier) as cum_share with offset offset
+)
+, 
+orders as (
+  select
+    v.entity_id,
+    v.area_name,
+    v.cluster,
+    o.dps_travel_time,
+    o.dps_travel_time_fee_local,
+    safe_divide(row_number() over (partition by v.entity_id, v.area_name, v.cluster order by o.dps_travel_time, o.dps_travel_time_fee_local),
+      count(*) over (partition by v.entity_id, v.area_name, v.cluster)) * 100 tt_percentile,
+  from `dh-logistics-product-ops.pricing.vendors_clustered` v
+  inner join `dh-logistics-product-ops.pricing.clustering_orders` o using (entity_id, vendor_id)
+  left join `dh-logistics-product-ops.pricing.clustering_caps` c using (entity_id)
+--   where o.dps_travel_time < c.avg_dps_travel_time + 5 * c.stddev_pop_dps_travel_time
+)
+select
+  o.entity_id,
+  o.area_name,
+  o.cluster,
+  t.tier,
+  t.upper_tt_percentile - t.lower_tt_percentile as share,
+  t.cum_share,
+  max(o.dps_travel_time) dps_travel_time_decimal,
+  format_time("%M:%S", time(timestamp_seconds(cast(round(max(o.dps_travel_time) * 60) as int64)))) dps_travel_time_formatted,
+  round(avg(o.dps_travel_time_fee_local),2) current_average_travel_time_fee_local,
+  approx_quantiles(o.dps_travel_time_fee_local, 100)[offset(50)] median_tt_fee,
+  count(*) orders,
+  sum(count(*)) over (partition by o.entity_id, o.area_name, o.cluster) total_orders
+from orders o
+left join tiers t on o.tt_percentile > t.lower_tt_percentile and o.tt_percentile <= t.upper_tt_percentile
+group by 1,2,3,4,5,6
+order by 1,2,3,4,5,6
+;
