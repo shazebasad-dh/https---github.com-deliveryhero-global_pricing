@@ -142,11 +142,12 @@ select
   # if the city represents more than 50% of the total orders, segment it by zone
    when city_order_share > 0.5 and zone_order_share_cum < 0.8 then concat(city_name,' - ', zone_name)
     when city_order_share > 0.5 and zone_order_share between 0.2 and 0.8 then concat(city_name,' - ', zone_name)
+    when city_order_share > 0.5 and zone_order_share between 0 and 0.2 then concat(city_name, ' - ', 'Other Zones')
   # otherwise, identify the major cities
-    when city_order_share between 0.2 and 0.5 then city_name 
+    when city_order_share between 0.2 and 0.5 then city_name
     when city_order_share_cum <= 0.8 then city_name
   # and group the smaller cities
-    else 'Other'
+    else 'Other Cities'
   end area_grouped,
   -- city_order_share,
   -- city_order_share_cum,
