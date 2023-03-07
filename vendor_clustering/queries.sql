@@ -186,7 +186,7 @@ vendors as (
 --       'CONCEPTS_BO_SCZ_FEB' in unnest(v2.tags)
 --       or 'CONCEPTS_BO_NOTSCZ_FEB' in unnest(v2.tags))
 --      end 
-  null as exception,
+  false as exception,
     date(v.activation_date_local) between current_date() - 29 and current_date - 2 as new_vendor,
   from `fulfillment-dwh-production.curated_data_shared_central_dwh.vendors` v
   left join `fulfillment-dwh-production.curated_data_shared_central_dwh.global_entities` g
@@ -331,6 +331,12 @@ orders as (
     v.cluster,
     o.dps_travel_time,
     o.dps_travel_time_fee_local,
+    o.gbv, --
+    o.cf,--
+    o.cpo, 
+    o.vf, --
+    o.dh_incentives,
+    o.other_incentives,
     safe_divide(row_number() over (partition by v.entity_id, v.area_name, v.cluster order by o.dps_travel_time, o.dps_travel_time_fee_local),
       count(*) over (partition by v.entity_id, v.area_name, v.cluster)) * 100 tt_percentile,
   from `dh-logistics-product-ops.pricing.vendors_clustered` v
@@ -349,6 +355,18 @@ select
   format_time("%M:%S", time(timestamp_seconds(cast(round(max(o.dps_travel_time) * 60) as int64)))) dps_travel_time_formatted,
   round(avg(o.dps_travel_time_fee_local),2) current_average_travel_time_fee_local,
   approx_quantiles(o.dps_travel_time_fee_local, 100)[offset(50)] median_tt_fee,
+  round(avg(o.gbv),2) current_average_basket_value_local,
+  -- approx_quantiles(o.gbv, 100)[offset(50)] median_gbv,
+  round(avg(o.cf),2) current_average_customer_fees,
+  -- approx_quantiles(o.cf, 100)[offset(50)] median_cf,
+  round(avg(o.vf),2) current_average_vendor_fees,
+  -- approx_quantiles(o.vf, 100)[offset(50)] median_vf,
+  round(avg(o.cpo),2) current_average_delivery_cost,
+  -- approx_quantiles(o.cpo, 100)[offset(50)] median_cpo,
+  round(avg(o.dh_incentives),2) current_average_dh_incentives,
+  -- approx_quantiles(o.dh_incentives, 100)[offset(50)] median_dh_incentives,
+  round(avg(o.other_incentives),2) current_average_other_incentives,
+  -- approx_quantiles(o.other_incentives, 100)[offset(50)] median_other_incentives,
   count(*) orders,
   sum(count(*)) over (partition by o.entity_id, o.area_name, o.cluster) total_orders
 from orders o
