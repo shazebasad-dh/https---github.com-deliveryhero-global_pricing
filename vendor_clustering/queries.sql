@@ -171,21 +171,22 @@ vendors as (
     a.city_name,
     a.zone_name,
   ## to-do: make the exception handling more scalable
-    case global_entity_id 
-    when 'PY_AR' then (
-     'FastFood-AR' in unnest(v2.tags) 
-      or v.vendor_id in ('190757', '191419', '191412', '191411', '191408', '191439', '311004', '391493')
-      or v.vendor_id in ('388770', '389866', '389505')
-      or 'Concepts-Ar' in unnest(v2.tags))
-    when 'AP_PA' then ( 
-      'no-dbdf-group-4' in unnest(v2.tags)
-      or 'no-dbdf-group-3' in unnest(v2.tags))
-    when 'PY_EC' then ( 
-      'EC_High_Commission_Food_Feb' in unnest(v2.tags))
-    when 'PY_BO' then ( 
-      'CONCEPTS_BO_SCZ_FEB' in unnest(v2.tags)
-      or 'CONCEPTS_BO_NOTSCZ_FEB' in unnest(v2.tags))
-     end as exception,
+--     case global_entity_id 
+--     when 'PY_AR' then (
+--      'FastFood-AR' in unnest(v2.tags) 
+--       or v.vendor_id in ('190757', '191419', '191412', '191411', '191408', '191439', '311004', '391493')
+--       or v.vendor_id in ('388770', '389866', '389505')
+--       or 'Concepts-Ar' in unnest(v2.tags))
+--     when 'AP_PA' then ( 
+--       'no-dbdf-group-4' in unnest(v2.tags)
+--       or 'no-dbdf-group-3' in unnest(v2.tags))
+--     when 'PY_EC' then ( 
+--       'EC_High_Commission_Food_Feb' in unnest(v2.tags))
+--     when 'PY_BO' then ( 
+--       'CONCEPTS_BO_SCZ_FEB' in unnest(v2.tags)
+--       or 'CONCEPTS_BO_NOTSCZ_FEB' in unnest(v2.tags))
+--      end 
+  null as exception,
     date(v.activation_date_local) between current_date() - 29 and current_date - 2 as new_vendor,
   from `fulfillment-dwh-production.curated_data_shared_central_dwh.vendors` v
   left join `fulfillment-dwh-production.curated_data_shared_central_dwh.global_entities` g
