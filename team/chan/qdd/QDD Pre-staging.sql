@@ -69,6 +69,8 @@ create temp table staging_table AS
     , scheme_id
     , assignment_id
     , dps_mean_delay
+    , dps_sessionid as dps_session_id
+    , ga_session_id
 
     from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_orders_v2`
     where created_date BETWEEN date_sub(start_date_filter, interval 2 day) AND date_add(end_date_filter, interval 2 day)
@@ -80,6 +82,8 @@ create temp table staging_table AS
         , map.test_name
         , map.variant
         , map.order_id
+        , dps.ga_session_id
+        , dps.dps_session_id
         , vertical_type
         , map.entity_id
         , map.platform_order_code
