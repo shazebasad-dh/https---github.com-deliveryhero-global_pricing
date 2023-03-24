@@ -62,8 +62,8 @@ SET vertical = "food";
         map.dps_minimum_order_value_local,
         map.gfv_local,
         map.gfv_eur,
-        case when order_delay_mins >=5  then order_id else NULL end order_delayed_5,
-        case when order_delay_mins >= 10 then order_id ELSE NULL end order_delayed_10,
+        case when order_delay_mins >=5  then platform_order_code else NULL end order_delayed_5,
+        case when order_delay_mins >= 10 then platform_order_code ELSE NULL end order_delayed_10,
         CASE
             WHEN map.commission_local IS NULL THEN gfv_local * cm.commission_percentage
             WHEN map.commission_local = 0 THEN gfv_local * cm.commission_percentage
@@ -183,8 +183,8 @@ SET vertical = "food";
         , SUM(mean_delay) AS mean_delay
         , SUM(service_fee_local) as service_fee_local
         , MAX(created_date) AS created_date
-        , sum(order_delayed_5) order_delayed_5
-        , sum(order_delayed_10) order_delayed_10
+        , count( distinct order_delayed_5) order_delayed_5
+        , count(distinct order_delayed_10) order_delayed_10
         FROM pre_staging_orders
         group by 1,2,3,4
     )
@@ -447,6 +447,8 @@ SET vertical = "food";
         ,  safe_divide(checkout_transaction_count, checkout_no_count) AS mCVR4
         , min_date AS min_date
         , max_date AS max_date
+        , safe_divide(order_delayed_5, Order_qty) orders_delayed_by_5
+        , safe_divide(order_delayed_10, Order_qty) orders_delayed_by_10
 
     from join_users_to_orders
 
