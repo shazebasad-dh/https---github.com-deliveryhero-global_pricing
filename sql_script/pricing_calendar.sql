@@ -1,3 +1,4 @@
+## currently scheduled under https://console.cloud.google.com/bigquery?tc=us:63590fee-0000-20d2-b3b5-14223bb270e6&authuser=0&project=logistics-data-staging-flat&ws=!1m0
 create or replace table `dh-logistics-product-ops.pricing.pricing_calendar` as
 with
 blocks as (
