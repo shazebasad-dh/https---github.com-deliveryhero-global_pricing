@@ -200,8 +200,10 @@ vendors as (
     and v.vertical_type = 'restaurants'
     -- and v.global_entity_id in ('PY_AR', 'AP_PA', 'PY_UY', 'PY_BO', 'PY_CL', 'PY_EC', 'PY_PY', 'PY_PE', 'PY_VE', 'PY_GT', 'PY_CR', 'PY_SV', 'PY_HN', 'PY_NI', 'PY_DO')
     and v.is_online
+    and v.is_own_delivery
     and not v.is_test_vendor
     and g.is_reporting_enabled
+    and g.is_platform_online
     -- and a.city_name = 'Bangkok'
 )
 ,
@@ -225,7 +227,7 @@ asa_lb as (
     entity_id,
     vendor_code vendor_id,
     asa_id,
-    master_asa_id,
+    master_asa_name,
     asa_name,
     case is_lb_lm when 'Y' then true when 'N' then false else null end is_lb,
     cvr3,
