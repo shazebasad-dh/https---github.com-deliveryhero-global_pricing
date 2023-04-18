@@ -1,7 +1,7 @@
 ## to-do: create a DAG to orchestrate the update: https://github.com/omar-elmaria/airflow_at_delivery_hero
 create or replace table `dh-logistics-product-ops.pricing.clustering_caps` as
 select
-  o.entity_id,
+  c.global_entity_id as entity_id,
   avg(o.gfv_eur) avg_gfv_eur,
   stddev_pop(o.gfv_eur) stddev_pop_gfv_eur,
   -- avg(o.linear_dist_customer_vendor) avg_linear_dist_customer_vendor,
@@ -9,6 +9,7 @@ select
   avg(o.dps_travel_time) avg_dps_travel_time,
   stddev_pop(o.dps_travel_time) stddev_pop_dps_travel_time,
 from `fulfillment-dwh-production.cl.dps_sessions_mapped_to_orders_v2` o
+inner join `fulfillment-dwh-production.dl.dynamic_pricing_global_configuration` c on o.entity_id = c.global_entity_id
 where true
   and o.created_date between current_date() - 29 and current_date() - 2
   and o.is_sent
@@ -200,6 +201,7 @@ vendors as (
     and v.vertical_type = 'restaurants'
     -- and v.global_entity_id in ('PY_AR', 'AP_PA', 'PY_UY', 'PY_BO', 'PY_CL', 'PY_EC', 'PY_PY', 'PY_PE', 'PY_VE', 'PY_GT', 'PY_CR', 'PY_SV', 'PY_HN', 'PY_NI', 'PY_DO')
     and v.is_online
+    and v.is_own_delivery
     and not v.is_test_vendor
     and g.is_reporting_enabled
     -- and a.city_name = 'Bangkok'
@@ -217,6 +219,7 @@ competition as (
   left join `fulfillment-dwh-production.dl.dynamic_pricing_global_configuration` cn
     on lower(p.country.country_code) = lower(cn.country_code)
   where c.date between current_date() - 29 and current_date() - 2
+  and p.is_logistic
   group by 1,2
 )
 ,
@@ -226,6 +229,7 @@ asa_lb as (
     vendor_code vendor_id,
     asa_id,
     master_asa_id,
+    master_asa_name,
     asa_name,
     case is_lb_lm when 'Y' then true when 'N' then false else null end is_lb,
     cvr3,
