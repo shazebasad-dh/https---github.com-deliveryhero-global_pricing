@@ -13,19 +13,19 @@
 --               NOTES: This script is using Service dl dl_gcc_service, however we dont add dependency in yaml as cross BU DL dependencies aren't yet feasible
 --             UPDATED: 2022-10-21 | Tanmoy Porel | CLOGBI-740 | Name changes and improvements (RASD-3512)
 --             UPDATED: 2022-10-21 | Tanmoy Porel | CLOGBI-756 | Add basket value based on last order id
---             UPDATED: 2023-03-24 | |  | Major refactor to support backfill and older surveys
+--             UPDATED: 2023-03-24 | Sebastian Lafaurie | CLOGBI - 783  | Major refactor to support backfill and older surveys
+--             UPDATED: 2023-04-18 | Sebastian Lafaurie | CLOGBI - 783  | Change keys used to extract questions values
+
 --                      ----------------------------------
 
 DECLARE start_date, end_date DATE;
 
 SET end_date = CURRENT_DATE();
 SET start_date = "2020-01-01"; --whole history
--- SET start_date = DATE_SUB(end_date, interval 7 day); --whole history
 
 
-/* For all surveys, there's a function that retrieves stadnard attributes.
-A subset of surveys uses "Too Cheap" and "Bargain" while other (and new surveys) uses
-"Too Inexpensive" and "Inexpensive" as keys
+/* For all surveys, there's a function that retrieves standard attributes.
+Which are the same for all surveys
 */
 CREATE TEMPORARY FUNCTION PARSE_STANDARD_ATTRIBUTES(value STRING) AS (
   (SELECT AS STRUCT
@@ -38,24 +38,23 @@ CREATE TEMPORARY FUNCTION PARSE_STANDARD_ATTRIBUTES(value STRING) AS (
   )
 );
 
+/* Qualtrics IDs (QID) are unique per surveys; some surveys have QID2,QID3,QID4,QID5
+while other have QID7,QID8,QID9,QID10. It's not scalalabe to track each survey unique QID.
+therefore, we take advantage of some surveys pattern design:
+- All questions answered by users ends with _TEXT, e.g., QID2_TEXT, QID3_TEXT
+- By design, VW questions are placed at the end; meaning that they're always the last 4 values
+in a array of all question. 
 
-CREATE TEMPORARY FUNCTION PARSE_GROUP1_KEYS(value STRING) AS (
-  (SELECT AS STRUCT
-    SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Too Cheap']") AS FLOAT64) AS too_inexpensive --For keys with spaces/special chars
-    , SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Bargain']") AS FLOAT64) AS inexpensive
-    , SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Expensive']") AS FLOAT64) AS expensive
-    , SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Too Expensive']") AS FLOAT64) AS too_expensive
-  )
-);
-
-CREATE TEMPORARY FUNCTION PARSE_GROUP2_KEYS(value STRING) AS (
-  (SELECT AS STRUCT
-    SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Too Inexpensive']") AS FLOAT64) AS too_inexpensive --For keys with spaces/special chars
-    , SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Inexpensive']") AS FLOAT64) AS inexpensive
-    , SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Expensive']") AS FLOAT64) AS expensive
-    , SAFE_CAST(JSON_EXTRACT_SCALAR(value, "$['Too Expensive']") AS FLOAT64) AS too_expensive
-  )
-);
+*/
+CREATE TEMP FUNCTION PARSE_VW_ANSWERS(json STRING)
+RETURNS ARRAY<STRUCT<key STRING, value FLOAT64>>
+LANGUAGE js AS """
+  const filterRaw = JSON.parse(json);
+  const criteria = filterRaw['values'];
+  const keys = Object.keys(criteria).filter(key => key.endsWith('_TEXT'));
+  const pairs = keys.map(key => ({key, value: criteria[key]}));
+  return pairs.length > 0 ? pairs:null;
+""";
 
 
 CREATE OR REPLACE TABLE `dh-logistics-product-ops.pricing._qualtrics_pricing_survey_responses_stg`
@@ -102,82 +101,67 @@ SELECT DISTINCT
   WHERE placed_at_local >= DATE_SUB(start_date, interval 1 week)
 )
 
-, parsed_response_1 AS (
+, parsed_response AS (
   SELECT
     created_date
     , created_at
     , response_id
     , ARRAY(SELECT PARSE_STANDARD_ATTRIBUTES(JSON_EXTRACT(payload, '$.values'))) AS response
-    , ARRAY(SELECT PARSE_GROUP1_KEYS(JSON_EXTRACT(payload, '$.values'))) AS vw_response
+    , PARSE_VW_ANSWERS(payload) AS vw_response
     , survey_type
     , survey_id
-  -- FROM `dh-logistics-product-ops.pricing._dl_pricing_qualtrics_survey_export`
-  FROM `fulfillment-dwh-production.dl_gcc_service.qualtrics_survey_export`
+  FROM `dh-logistics-product-ops.pricing._dl_pricing_qualtrics_survey_export`
+  -- FROM `fulfillment-dwh-production.dl_gcc_service.qualtrics_survey_export`
   WHERE survey_type = 'global_pricing'
   AND created_date BETWEEN start_date AND end_date
-)
+  -- AND survey_id = "SV_7TYmyrtMMR8jt9Y"
 
-, parsed_response_2 AS (
-  SELECT
-    created_date
-    , created_at
-    , response_id
-    , ARRAY(SELECT PARSE_STANDARD_ATTRIBUTES(JSON_EXTRACT(payload, '$.values'))) AS response
-    , ARRAY(SELECT PARSE_GROUP2_KEYS(JSON_EXTRACT(payload, '$.values'))) AS vw_response 
-    , survey_type
-    , survey_id
-  -- FROM `dh-logistics-product-ops.pricing._dl_pricing_qualtrics_survey_export`
-  FROM `fulfillment-dwh-production.dl_gcc_service.qualtrics_survey_export`
-  WHERE survey_type = 'global_pricing'
-  AND created_date BETWEEN start_date AND end_date
-
-)
-, append_responses as (
-  SELECT *
-  --- count if all VW answers are complete
-  , (SELECT 
-    IF(too_inexpensive IS NULL, 0, 1)
-      + IF(inexpensive IS NULL, 0, 1)
-      + IF(expensive IS NULL, 0, 1)
-      + IF(too_expensive IS NULL, 0, 1)    
-    FROM UNNEST(vw_response) as x
-    )
-    as n_parsed_answers
-  FROM parsed_response_1
-
-  UNION ALL 
-
-  SELECT *
-  , (SELECT 
-    --- count if all VW answers are complete
-    IF(too_inexpensive IS NULL, 0, 1)
-      + IF(inexpensive IS NULL, 0, 1)
-      + IF(expensive IS NULL, 0, 1)
-      + IF(too_expensive IS NULL, 0, 1)    
-    FROM UNNEST(vw_response) as x
-    )
-    as n_parsed_answers
-  FROM parsed_response_2
-)
-, deduplicate_responses as (
-  SELECT *
-  FROM append_responses
-  --- leave the parsing method that fetch the most number of VW answers for a given response.
-  qualify row_number() over(partition by survey_id, response_id ORDER BY n_parsed_answers DESC) = 1
 )
 
 , filter_unvalid_responses as (
   SELECT * EXCEPT(response, vw_response)
+    /*
+    Filter only VW answers
+    */
+  , ARRAY(SELECT x.value
+      FROM UNNEST(vw_response) x 
+      WITH OFFSET as vw_answer_order 
+      WHERE (CASE 
+            WHEN ARRAY_LENGTH(vw_response) = 4 THEN TRUE
+            /*
+            We assume that VW answers 
+            are always the last 4 an user answer; which is how
+            all surveys so far has been designed
+            */
+            WHEN vw_answer_order >= ARRAY_LENGTH(vw_response) - 4 THEN TRUE 
+            ELSE FALSE
+          END
+      )
+    ) AS only_vw_answers
+    /*
+    Save other answers as an array
+    */
+    , ARRAY(SELECT x
+      FROM UNNEST(vw_response) x 
+      WITH OFFSET as vw_answer_order 
+      WHERE (CASE 
+            WHEN ARRAY_LENGTH(vw_response) = 4 THEN FALSE
+            WHEN vw_answer_order < ARRAY_LENGTH(vw_response) - 4 THEN TRUE 
+            ELSE FALSE
+          END
+      )
+    ) AS other_answers
+  
   , DATE(DATE_TRUNC(created_at, MONTH)) as response_month
-  FROM deduplicate_responses
+  FROM parsed_response
   LEFT JOIN UNNEST(response) r
-  LEFT JOIN UNNEST(vw_response)
   WHERE TRUE
   AND status = 0 -- keep only valid user responses
   -- finished and complete answers
   AND finished = 1 
-  AND n_parsed_answers = 4 
+  AND array_length(vw_response) >= 4 
  ) 
+
 
 
 , filter_isolated_answers as (
@@ -192,8 +176,26 @@ SELECT DISTINCT
   ) > 100
 )
 
+-- , sort_vw_answer as (
+--   SELECT * EXCEPT(only_vw_answers)
+--   /*
+--   Takes into account whether the surveys have the
+--   question in ascending or descending order
+--   */
+--   , ARRAY(SELECT x FROM UNNEST(only_vw_answers) x ORDER BY x) only_vw_answers
+--   FROM filter_isolated_answers
+-- )
+
 , enrich_data_from_helper as (
-  SELECT parsed.*
+  SELECT parsed.* except(only_vw_answers)
+  /*
+  we also extract each VW responses by position as
+  this is how survey are designed
+  */
+  , only_vw_answers[OFFSET(0)] as too_inexpensive
+  , only_vw_answers[OFFSET(1)] as inexpensive
+  , only_vw_answers[OFFSET(2)] as expensive
+  , only_vw_answers[OFFSET(3)] as too_expensive
   , helper.survey_name
   , helper.country_code AS country_code
   , helper.vertical_parent
@@ -224,6 +226,7 @@ SELECT DISTINCT
     AND parsed.global_entity_id = orders.global_entity_id
 )
 
+, final_table as (
 
  SELECT
   region
@@ -245,6 +248,9 @@ SELECT DISTINCT
   , lastOrderId AS last_order_id
   , basket_value
   , vertical_parent
+  , other_answers
+from enrich_data_from_orders
+)
 
-
-from enrich_data_from_orders;
+SELECT *
+from final_table;
