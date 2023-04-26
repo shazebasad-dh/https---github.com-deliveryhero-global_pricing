@@ -1,0 +1,12 @@
+pingouin
+pyarrow
+google-cloud 
+google-cloud-bigquery[pandas]
+google-cloud-storage
+google-cloud-bigquery-storage
+pandas>=1.3.5
+tqdm
+polars
+openpyxl
+#dev
+notebook  
