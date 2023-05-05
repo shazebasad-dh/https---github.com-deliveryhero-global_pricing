@@ -143,6 +143,18 @@ class HSTransferOperator:
         job.result()
         print("Merge has finished")
 
+    def run_qdd_query(self, query:str):
+        """Creates a BQ job to run the query that produces the
+        qdd table
+
+        Args:
+            query (str): QDD query
+        """
+        print("Initiating QDD task...")
+        job = self.client.query(query)
+        job.result()
+        print("QDD has finished")
+
     def _return_job_dates(self, end_date:datetime, days_back:datetime) -> list[str]:
         """Return the run period  as list of string
 
@@ -160,6 +172,7 @@ class HSTransferOperator:
         self
         , staging_query:str
         , merge_query:str
+        , qdd_query:str
         , staging_table_name:str
         , production_table_name:str
         , end_date:datetime
@@ -186,5 +199,10 @@ class HSTransferOperator:
             merge_query
             , staging_table_name
             , production_table_name
+        )
+
+
+        self.run_qdd_query(
+            qdd_query
         )
 

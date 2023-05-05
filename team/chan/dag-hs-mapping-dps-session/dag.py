@@ -22,6 +22,7 @@ if __name__=="__main__":
     hs_transfer_operator.run_dag(
                 staging_query = STAGING_QUERY
             , merge_query = MERGE_QUERY
+            , qdd_query=QDD_QUERY
             , staging_table_name = "hs_sa_rdf_orders_stg"
             , production_table_name = "hs_sa_rdf_orders"
             , end_date = datetime.today()
