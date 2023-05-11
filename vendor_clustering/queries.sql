@@ -1,4 +1,14 @@
 ## to-do: create a DAG to orchestrate the update: https://github.com/omar-elmaria/airflow_at_delivery_hero
+## define areas of vendors with no orders
+## expand the model to account for
+## non-restaurants verticals
+## non-OD vendors (?)
+## revisit the area grouping definition for zones (e.g. in HK we may have too many areas right now, and many of them are overlapping)
+
+##### LOGS #######
+## 11-05-2023 added CF composition (DF + SF + SBF); added zone_name as a column
+
+
 create or replace table `dh-logistics-product-ops.pricing.clustering_caps` as
 select
   c.global_entity_id as entity_id,
@@ -27,6 +37,9 @@ select
   -- o.linear_dist_customer_vendor,
   o.dps_travel_time,
   o.dps_travel_time_fee_local,
+  ifnull(o.delivery_fee_eur,0) delivery_fee_eur,
+  ifnull(o.service_fee_eur,0) service_fee_eur,
+  ifnull(o.mov_customer_fee_eur,0) mov_customer_fee_eur,
   ifnull(o.delivery_fee_eur,0) + ifnull(o.service_fee_eur,0) + ifnull(o.mov_customer_fee_eur,0) cf,
   ifnull(o.commission_eur,0) + ifnull(o.joker_vendor_fee_eur,0) vf,
   ifnull(o.voucher_dh_eur,0) + ifnull(o.discount_dh_eur,0) dh_incentives,
@@ -229,7 +242,7 @@ asa_lb as (
     vendor_code vendor_id,
     asa_id,
     master_asa_id,
-    master_asa_name,
+    asa_common_name,
     asa_name,
     case is_lb_lm when 'Y' then true when 'N' then false else null end is_lb,
     cvr3,
@@ -265,12 +278,16 @@ aggregated_kpis as (
   select
     v.* except (city_name, zone_name),
     g.area_grouped area_name,
+    g.zone_name,
     count(*) < 10 insufficient_data,
     count(*) orders,
     avg(o.gbv) avg_basket,
     avg(o.dps_travel_time) avg_distance,
     avg(o.cf) avg_cf,
     avg(o.vf) avg_vf,
+    avg(o.delivery_fee_eur) avg_df,
+    avg(o.service_fee_eur) avg_sf,
+    avg(o.mov_customer_fee_eur) avg_sbf,
     avg(o.dh_incentives) avg_dh_incentives,
     avg(o.other_incentives) avg_other_incentives,
     avg(o.cpo) avg_delivery_cost,
@@ -279,7 +296,7 @@ aggregated_kpis as (
     using (entity_id, city_name, zone_name)
   left join `dh-logistics-product-ops.pricing.clustering_orders` o
     using (entity_id, vendor_id)
-  group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18
+  group by 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20
 )
 ,
 normalized_kpis as (
