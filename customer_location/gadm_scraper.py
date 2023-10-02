@@ -35,7 +35,7 @@ chrome_options.add_argument("start-maximized") # Required for a maximized Viewpo
 chrome_options.add_experimental_option('excludeSwitches', ['enable-logging', 'enable-automation', 'disable-popup-blocking']) # Disable pop-ups to speed up browsing
 chrome_options.add_experimental_option("detach", True) # Keeps the Chrome window open after all the Selenium commands/operations are performed 
 chrome_options.add_experimental_option('prefs', {'intl.accept_languages': 'en,en_US'}) # Operate Chrome using English as the main language
-# chrome_options.add_argument("--headless=new") # Operate Selenium in headless mode
+chrome_options.add_argument("--headless=new") # Operate Selenium in headless mode
 chrome_options.add_argument('--no-sandbox') # Disables the sandbox for all process types that are normally sandboxed. Meant to be used as a browser-level switch for testing purposes only
 chrome_options.add_argument('--disable-gpu') # An additional Selenium setting for headless to work properly, although for newer Selenium versions, it's not needed anymore
 chrome_options.add_argument("enable-features=NetworkServiceInProcess") # Combats the renderer timeout problem
