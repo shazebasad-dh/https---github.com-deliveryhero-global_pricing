@@ -10,7 +10,7 @@ warnings.filterwarnings(action="ignore")
 
 ###---------------------------------###---------------------------------###
 
-def gadm_dataset_generator():
+def gadm_dataset_uploader():
     # Set the current working directory to ~/global_pricing/customer_location/shape_files
     if "shape_files" in os.getcwd():
         pass
