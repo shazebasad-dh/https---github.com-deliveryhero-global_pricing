@@ -1,4 +1,5 @@
 # Import packages
+import logging
 import os
 import shutil
 import time
@@ -16,13 +17,18 @@ import pandas as pd
 from google.cloud import bigquery, bigquery_storage
 from joblib import Parallel, delayed
 from selenium import webdriver
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.common.exceptions import NoSuchElementException
+
+logging.basicConfig(
+    filename="gadm.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%d-%m-%y %H:%M:%S",
+    level=logging.INFO,
+)
 
 # Ignore warnings
 warnings.filterwarnings(action="ignore")
@@ -86,7 +92,10 @@ def download_gadm_datasets(
     ###---------------------------------###---------------------------------###
 
     # Define a function to select a country and download its shape file
-    def download_shape_file(country):
+    def download_shape_file(country):            
+        # Print a status message indicating that the GADM scraper started
+        logging.info(f"Starting the GADM scraper for country {country}...")
+
         # Pull the 3-letter country code from df_country_name
         country_code = df_country_name.loc[df_country_name["country_name"] == country, "country_iso_a3"].values[0]
 
@@ -94,7 +103,7 @@ def download_gadm_datasets(
         file_name = f"gadm41_{country_code}_shp.zip"
 
         # Instantiate the Webdriver and download the latest chrome driver by default using the ChromeDriverManager
-        driver = webdriver.Chrome(service=Service(executable_path=ChromeDriverManager().install()), options=chrome_options)
+        driver = webdriver.Chrome(options=chrome_options)
 
         # Navigate to the target website
         driver.get(base_url)
@@ -102,13 +111,20 @@ def download_gadm_datasets(
         # Maximise the Chrome window
         driver.maximize_window()
 
+        # Close the pop-up if it appears
+        try:
+            WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, "//div[@id='dismiss-button']")))
+            driver.find_element(by=By.XPATH, value="//div[@id='dismiss-button']").click()
+        except TimeoutException:
+            logging.info("No pop-up was found. Moving to the next command...")
+
         # Wait for the page to load and click on the country selector
         WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH, "//select[@id='countrySelect']")))
         try:
             select_country = Select(driver.find_element(by=By.XPATH, value="//select[@id='countrySelect']"))
             select_country.select_by_visible_text(country)
         except NoSuchElementException:
-            print(f"Could not find the country {country} in the dropdown. Moving to the next country...\n")
+            logging.info(f"Could not find the country {country} in the dropdown. Moving to the next country...\n")
             driver.quit()
             return
 
@@ -123,33 +139,35 @@ def download_gadm_datasets(
         # If the file doesn't exist, print a message saying that we are still waiting for the file to appear and wait 30 seconds before proceeding to the next command
         while path.is_file() == False:
             t2 = datetime.now()
-            print(f"[{file_name} status] - Still waiting for the {file_name} to download. {t2 - t1} have elapsed thus far")
+            logging.info(f"[{country}, {file_name} status] - Still waiting for the {file_name} to download. {t2 - t1} have elapsed thus far")
             time.sleep(10)
 
             # If the file exists, print a success message, close the driver, and move the file from the Downloads folder to the current directory
             if path.is_file() == True:
-                print(f"[{file_name} status] - The file {file_name} has been downloaded. Closing the driver now...")
+                logging.info(f"[{country}, {file_name} status] - The file {file_name} has been downloaded. Closing the driver now...")
 
                 # Close the driver
                 driver.quit()
 
                 # Move the file from the downloads folder to the current directory
                 shutil.move(src=f"{downloads_dir}/{file_name}", dst=final_downloads_dst + f"/{file_name}")
-                print(f"[{file_name} status] - Moved the file {file_name} to the current working directory. Moving to the next date...\n")
+                logging.info(f"[{country}, {file_name} status] - Moved the file {file_name} to the current working directory. Moving to the next date...\n")
                 
                 # Break out of the loop
                 break
         
         # Unzip the downloaded shape file
+        logging.info(f"Unzipping the shape files of {country}...")
         with ZipFile(final_downloads_dst + f"/{file_name}", "r") as f:
             # Extract in current directory
             f.extractall(path=final_downloads_dst)
         
         # Delete the zip file
+        logging.info(f"Deleting the zip file of {country}...")
         os.remove(final_downloads_dst + f"/{file_name}")
 
         # Print a success message signifying that the process ended for this country
-        print(f"The shape files of {country} have been successfully downloaded, moved, and unzipped. Moving to the next country...\n")
+        logging.info(f"The shape files of {country} have been successfully downloaded, moved, and unzipped. Moving to the next country...\n")
         return
 
     # Execute the function in parallel for all the countries in df_country_name
