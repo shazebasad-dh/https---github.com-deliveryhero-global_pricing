@@ -1,17 +1,30 @@
 # Import packages
-import geopandas as gpd
-from google.cloud import bigquery
-from google.cloud import bigquery_storage
-import pandas as pd
+import logging
 import os
 import re
+
+import geopandas as gpd
+import pandas as pd
+from google.cloud import bigquery, bigquery_storage
+
+logging.basicConfig(
+    filename="gadm.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%d-%m-%y %H:%M:%S",
+    level=logging.INFO,
+)
 import warnings
+
 warnings.filterwarnings(action="ignore")
 
 ###---------------------------------###---------------------------------###
 
 def gadm_dataset_uploader():
+    # Print a status message indicating that the GADM dataset uploader started
+    logging.info("\nStarting the GADM dataset uploader...")
+
     # Set the current working directory to ~/global_pricing/customer_location/shape_files
+    logging.info("Setting the current working directory to ~/global_pricing/customer_location/shape_files...")
     if "shape_files" in os.getcwd():
         pass
     else:
@@ -28,7 +41,8 @@ def gadm_dataset_uploader():
 
     ###---------------------------------###---------------------------------###
 
-    # Extract the three letter iso code of the country defined above
+    # Extract the three letter iso code of all countries in the global_entities table
+    logging.info("Extracting the three letter iso code of all countries in the global_entities table...")
     country_name_query = """
         SELECT DISTINCT country_name, country_iso_a3
         FROM `fulfillment-dwh-production.curated_data_shared_coredata.global_entities`
@@ -43,6 +57,7 @@ def gadm_dataset_uploader():
     ###---------------------------------###---------------------------------###
 
     # Iterate over each country in df_country_name
+    logging.info("Iterating over each country in df_country_name and creating separate data frames with a suffix indicating the level...")
     for iso in df_country_name["country_iso_a3"]:
         # List all the shape files that end with ".shp" and contain the 3-letter country code
         shp_files = [i for i in os.listdir(os.getcwd()) if i.endswith(".shp") and iso in i]
@@ -60,6 +75,7 @@ def gadm_dataset_uploader():
     ###---------------------------------###---------------------------------###
 
     # Merge the data frames that have common levels together
+    logging.info("Merging the data frames that have common levels together...")
 
     # Declare empty lists to store the data frames that will be merged
     # First, create a list of all geo spatial levels in df_gpd_list
@@ -90,7 +106,7 @@ def gadm_dataset_uploader():
     # Upload the combined data frames to BigQuery
     df_gpd_merged_list = [i for i in dir() if re.findall(pattern="df_gpd_[0-9]", string=i)]
     for i in df_gpd_merged_list:
-        print(f"Uploading {i} to BigQuery...")
+        logging.info(f"Uploading {i} to BigQuery...")
 
         # Change the column names to lower case
         vars()[i].columns = vars()[i].columns.str.lower()
