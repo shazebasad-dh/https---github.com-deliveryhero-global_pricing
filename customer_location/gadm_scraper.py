@@ -19,9 +19,11 @@ from joblib import Parallel, delayed
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select, WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
 
 logging.basicConfig(
     filename="gadm.log",
@@ -103,7 +105,7 @@ def download_gadm_datasets(
         file_name = f"gadm41_{country_code}_shp.zip"
 
         # Instantiate the Webdriver and download the latest chrome driver by default using the ChromeDriverManager
-        driver = webdriver.Chrome(options=chrome_options)
+        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=chrome_options)
 
         # Navigate to the target website
         driver.get(base_url)
