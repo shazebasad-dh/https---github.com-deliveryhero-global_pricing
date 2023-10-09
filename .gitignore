@@ -1,3 +1,6 @@
 .DS_Store
 *.ini
 *.bat
+shape_files/
+customer_location/gadm.log
+__pycache__
