@@ -1,0 +1,40 @@
+/*
+For FDNC we do not care about a precise campaign versioning from the vendor POV but rather we're interested in the
+time periods the vendor was part of any active FDNC campaign. 
+*/
+
+CREATE OR REPLACE TABLE `logistics-data-storage-staging.long_term_pricing.vendor_customer_condition_campaign_membership`
+CLUSTER BY entity_id, vendor_code
+AS
+WITH unnest_vendor AS (
+  SELECT
+    entity_id
+    , vendor_id AS vendor_code
+    -- , created_at
+    , campaign_id
+    , campaign_name
+    , active_from
+    , IFNULL(active_to, "2099-01-01") as active_to
+
+  FROM `logistics-data-storage-staging.long_term_pricing.pricing_campaign_configuration_versions`
+  LEFT JOIN UNNEST(sorted_assigned_vendor_ids) vendor_id
+  WHERE vendor_id IS NOT NULL
+    AND vendor_id != ''
+    AND active = True
+    AND customer_condition_id IS NOT NULL
+)
+
+, deduplicate_concurrent_campaign as (
+SELECT *
+FROM unnest_vendor
+-- WHERE entity_id = "FP_SG"
+-- AND vendor_code = "zzzx"
+/*
+In case a vendor is part of two "active" campaigns, we take the oldest one.
+*/
+QUALIFY ROW_NUMBER() OVER(PARTITION BY entity_id, vendor_code, active_to ORDER BY campaign_id) = 1
+)
+
+SELECT * EXCEPT(active_to)
+, IF(active_to = "2099-01-01", NULL, active_to) as active_to
+FROM deduplicate_concurrent_campaign
