@@ -117,3 +117,44 @@ SELECT
     WHEN gadm_data_verdict IN ("gadm_data_not_suitable", "gadm_data_not_available") AND wof_data_verdict != "wof_data_works" THEN "dh_proprietary_data"
   END AS combined_data_source_verdict
 FROM wof_data_verdict_tbl
+
+###-----------------------------------------###------------------------------------------------###
+
+### A query to collect admin area data from different sources into one table
+CREATE OR REPLACE TABLE `logistics-data-storage-staging.long_term_pricing.customer_location_admin_area_data` AS
+SELECT
+  b.country_code,
+  country AS country_name,
+  CONCAT(name_1, " | ", name_2) AS admin_area_name,
+  LOWER(engtype_2) AS admin_area_type,
+  ST_GEOGFROMTEXT(geometry) AS admin_area_geometry,
+  "gadm_level_2" AS data_source
+FROM `logistics-data-storage-staging.long_term_pricing.gadm_geo_spatial_data_level_2` a
+LEFT JOIN `logistics-data-storage-staging.long_term_pricing.customer_area_data_evaluation_per_dh_market` b ON a.gid_0 = b.country_iso_a3
+WHERE gid_0 IN (SELECT country_iso_a3 FROM `logistics-data-storage-staging.long_term_pricing.customer_area_data_evaluation_per_dh_market` WHERE combined_data_source_verdict = 'level_2')
+
+UNION ALL
+
+SELECT
+  b.country_code,
+  country AS country_name,
+  CONCAT(name_1, " | ", name_2, " | ", name_3) AS admin_area_name,
+  LOWER(engtype_3) AS admin_area_type,
+  ST_GEOGFROMTEXT(geometry) AS admin_area_geometry,
+  "gadm_level_3" AS data_source
+FROM `logistics-data-storage-staging.long_term_pricing.gadm_geo_spatial_data_level_3` a
+LEFT JOIN `logistics-data-storage-staging.long_term_pricing.customer_area_data_evaluation_per_dh_market` b ON a.gid_0 = b.country_iso_a3
+WHERE gid_0 IN (SELECT country_iso_a3 FROM `logistics-data-storage-staging.long_term_pricing.customer_area_data_evaluation_per_dh_market` WHERE combined_data_source_verdict = 'level_3')
+
+UNION ALL
+
+SELECT
+  wof_country_code,
+  b.country_name AS country_name,
+  wof_name AS admin_area_name,
+  wof_placetype_eng AS admin_area_type,
+  geometry AS admin_area_geometry,
+  "wof" AS data_source
+FROM `logistics-data-storage-staging.long_term_pricing.wof_data_per_dh_market` a
+LEFT JOIN `logistics-data-storage-staging.long_term_pricing.customer_area_data_evaluation_per_dh_market` b ON LOWER(a.wof_country_code) = b.country_code
+WHERE wof_country_code IN (SELECT country_code FROM `logistics-data-storage-staging.long_term_pricing.customer_area_data_evaluation_per_dh_market` WHERE combined_data_source_verdict = 'wof_data')
