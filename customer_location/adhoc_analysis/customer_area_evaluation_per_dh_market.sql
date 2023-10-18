@@ -114,7 +114,7 @@ SELECT
   CASE
     WHEN gadm_data_verdict NOT IN ("gadm_data_not_suitable", "gadm_data_not_available") THEN gadm_data_verdict
     WHEN gadm_data_verdict IN ("gadm_data_not_suitable", "gadm_data_not_available") AND wof_data_verdict = "wof_data_works" THEN "wof_data"
-    WHEN gadm_data_verdict IN ("gadm_data_not_suitable", "gadm_data_not_available") AND wof_data_verdict != "wof_data_works" THEN "dh_proprietary_data"
+    WHEN gadm_data_verdict IN ("gadm_data_not_suitable", "gadm_data_not_available") AND wof_data_verdict != "wof_data_works" THEN "internal_dh_data | no source"
   END AS combined_data_source_verdict
 FROM wof_data_verdict_tbl
 
