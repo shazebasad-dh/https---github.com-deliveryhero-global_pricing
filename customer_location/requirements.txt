@@ -45,7 +45,7 @@ connexion==2.14.2
 contourpy==1.1.0
 cron-descriptor==1.4.0
 croniter==1.4.1
-cryptography==41.0.3
+cryptography==41.0.4
 cycler==0.11.0
 db-dtypes==1.1.1
 debugpy==1.6.7
