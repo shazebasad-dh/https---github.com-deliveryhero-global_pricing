@@ -125,8 +125,10 @@ CREATE OR REPLACE TABLE `logistics-data-storage-staging.long_term_pricing.custom
 SELECT
   b.country_code,
   country AS country_name,
+  a.name_1 AS city_name,
   CONCAT(name_1, " | ", name_2) AS admin_area_name,
   LOWER(engtype_2) AS admin_area_type,
+  name_2 AS raw_admin_area_name,
   ST_GEOGFROMTEXT(geometry) AS admin_area_geometry,
   "gadm_level_2" AS data_source
 FROM `logistics-data-storage-staging.long_term_pricing.gadm_geo_spatial_data_level_2` a
@@ -138,8 +140,10 @@ UNION ALL
 SELECT
   b.country_code,
   country AS country_name,
+  a.name_1 AS city_name,
   CONCAT(name_1, " | ", name_2, " | ", name_3) AS admin_area_name,
   LOWER(engtype_3) AS admin_area_type,
+  name_3 AS raw_admin_area_name,
   ST_GEOGFROMTEXT(geometry) AS admin_area_geometry,
   "gadm_level_3" AS data_source
 FROM `logistics-data-storage-staging.long_term_pricing.gadm_geo_spatial_data_level_3` a
@@ -151,8 +155,10 @@ UNION ALL
 SELECT
   wof_country_code,
   b.country_name AS country_name,
+  NULL AS city_name,
   wof_name AS admin_area_name,
   wof_placetype_eng AS admin_area_type,
+  NULL AS raw_admin_area_name,
   geometry AS admin_area_geometry,
   "wof" AS data_source
 FROM `logistics-data-storage-staging.long_term_pricing.wof_data_per_dh_market` a
