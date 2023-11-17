@@ -1,7 +1,9 @@
-  SELECT 
-      name_1 as city
-      , name_2 as area_name
-      , geometry AS area_shape
-  FROM `logistics-data-storage-staging.long_term_pricing.gadm_geo_spatial_data_level_2`
-  WHERE gid_0 = "TUR"
-  and name_1 = "Istanbul"
+SELECT 
+  country_code
+  , city_name as city
+  , raw_admin_area_name as area_name
+  , admin_area_geometry as area_shape
+
+FROM `logistics-data-storage-staging.long_term_pricing.customer_location_admin_area_data`
+WHERE country_code = "{country_code}"
+AND city_name = "{city}"
