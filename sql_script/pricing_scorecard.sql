@@ -47,7 +47,7 @@
 
 ,population AS ( ##### With this way of calculating the fields, the underlying data works fine, otherwise it breaks due to duplicated rows in the upstream tables
 SELECT
-    ANY_VALUE(cp.dh_COUNTry_code) AS dh_country_code,
+    ANY_VALUE(cp.dh_country_code) AS dh_country_code,
     cp.month,
     cp.country_code,
     MAX(cp.total_population) AS total_population,
