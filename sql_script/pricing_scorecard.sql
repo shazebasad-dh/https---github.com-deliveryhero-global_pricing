@@ -7,7 +7,7 @@
   -- Martin Fourcade: 15 Mar. 2024:
     -- Changed scores calculations
     -- Fixed bug for duplicated data for some entity-months combinations
-    -- 
+    -- Backfilled the table
 
 ######################### INPUTS
 
@@ -17,7 +17,7 @@
 
 
   ######## SET RUN MODE
-  SET backfill = TRUE;
+  SET backfill = FALSE;
 
   ######## SET END DATE
   SET end_date_filter = CURRENT_DATE();
