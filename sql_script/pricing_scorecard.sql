@@ -22,7 +22,7 @@
 
 
   ######## SET RUN MODE
-  SET backfill = TRUE;
+  SET backfill = FALSE;
 
   ######## SET END DATE
   SET end_date_filter = CURRENT_DATE();
@@ -80,7 +80,7 @@ SELECT
     o.partition_date_local >=  DATE_SUB(start_date_filter, INTERVAL 2 DAY)
     AND end_date_filter < DATE_ADD(end_date_filter, INTERVAL 2 DAY)
     AND o.is_successful
-    AND o.vertical_type IN ('restaurants', 'coffee', 'street_food') 
+    AND o.vertical_type IN ('restaurants', 'coffee', 'restaurant', 'street_food') 
   GROUP BY 1,2
 )
 
@@ -115,7 +115,7 @@ SELECT
     r.share_of_responses,
     m.main_dish,
     pme.pme,
-    COUNT(DISTINCT CASE WHEN is_own_delivery THEN platform_order_code END) AS od_restaurant_orders,
+    COUNT(DISTINCT CASE WHEN is_own_delivery THEN platform_order_code END) AS od_restaurant_orders, #IS OD filter may be removed
     COUNT(DISTINCT CASE WHEN is_own_delivery THEN platform_order_code END)/t.orders AS od_rest_orders_share,
     COUNT(DISTINCT CASE WHEN is_own_delivery THEN analytical_customer_id END) od_restaurant_users,
     COUNT(DISTINCT analytical_customer_id )/p.addressable_population user_penetration,
@@ -127,7 +127,7 @@ SELECT
     SUM(dps_surge_fee_eur)/COUNT(DISTINCT platform_order_code) surge_fee_eur,
     SUM(service_fee_eur)/COUNT(DISTINCT platform_order_code) sf_eur,
     SUM(mov_customer_fee_eur)/COUNT(DISTINCT platform_order_code) sbf_eur,
-    SAFE_DIVIDE(SUM(delivery_fee_eur+service_fee_eur+mov_customer_fee_eur+priority_fee_eur),COUNT(DISTINCT platform_order_code)) cf_eur,
+    SAFE_DIVIDE(SUM(delivery_fee_eur+service_fee_eur+mov_customer_fee_eur+priority_fee_eur IGNORE NULLS),COUNT(DISTINCT platform_order_code)) cf_eur,
     SUM(dps_minimum_order_value_eur)/COUNT(DISTINCT platform_order_code) mov_eur,
     SUM(commission_eur)/COUNT(DISTINCT platform_order_code) comm_eur,
     SUM(joker_vendor_fee_eur)/COUNT(DISTINCT platform_order_code) joker_eur,
@@ -162,8 +162,7 @@ SELECT
     AND is_sent
     -- AND (o.vendor_vertical_parent in ('Restaurant', 'Restaurants', 'restaurant', 'restaurants')
     -- OR  o.vendor_vertical_parent is null)
-    AND o.vertical_type IN ('restaurants','restautant', 'coffee', 'street_food')
-    AND o.vertical_type NOT IN ('courier', 'courier_business')
+    AND o.vertical_type IN ('restaurants', 'restaurant', 'coffee', 'street_food')
     AND o.entity_id != "FP_DE" 
 
     GROUP BY ALL
@@ -183,9 +182,9 @@ SELECT
       COUNT(CASE WHEN order_price_mechanisms.is_small_order_fee THEN platform_order_code END) AS small_order_fee_orders,
       COUNT(CASE WHEN order_price_mechanisms.is_dbmov THEN platform_order_code END) AS variable_mov_orders,
       COUNT(CASE WHEN order_price_mechanisms.is_surge_mov THEN platform_order_code END) AS surge_mov_orders,
-      COUNT(CASE WHEN vendor_price_mechanisms.vendor_hAS_time_condition THEN platform_order_code END) AS tod_orders,
-      COUNT(CASE WHEN vendor_price_mechanisms.vendor_hAS_customer_condition THEN platform_order_code END) AS fdnc_orders,
-      COUNT(CASE WHEN vendor_price_mechanisms.vendor_hAS_customer_area THEN platform_order_code END) AS customer_location_orders,
+      COUNT(CASE WHEN vendor_price_mechanisms.vendor_has_time_condition THEN platform_order_code END) AS tod_orders,
+      COUNT(CASE WHEN vendor_price_mechanisms.vendor_has_customer_condition THEN platform_order_code END) AS fdnc_orders,
+      COUNT(CASE WHEN vendor_price_mechanisms.vendor_has_customer_area THEN platform_order_code END) AS customer_location_orders,
       COUNT(CASE WHEN only_dps_scheme_price_mechanisms.mov_type = "Flat_non_zero" THEN platform_order_code END) AS flat_mov_orders,
       COUNT(CASE WHEN price_mechanism_fields.exposed_price_mechanism_COUNT >= 4 THEN platform_order_code END) AS multiple_pm_orders,
       COUNT(CASE WHEN price_mechanism_fields.exposed_price_mechanism_COUNT = 3 THEN platform_order_code END) AS triple_pm_orders,
@@ -199,10 +198,10 @@ SELECT
       COUNT(CASE WHEN order_price_mechanisms.is_small_order_fee THEN platform_order_code END)/COUNT(platform_order_code) AS small_order_fee_share,
       COUNT(CASE WHEN order_price_mechanisms.is_dbmov THEN platform_order_code END) / COUNT(platform_order_code) AS variable_mov_share,
       COUNT(CASE WHEN order_price_mechanisms.is_surge_mov THEN platform_order_code END)/COUNT(platform_order_code) AS surge_mov_share,
-      COUNT(CASE WHEN vendor_price_mechanisms.vendor_hAS_time_condition THEN platform_order_code END)/COUNT(platform_order_code) AS tod_share,
-      COUNT(CASE WHEN vendor_price_mechanisms.vendor_hAS_customer_condition THEN platform_order_code END)/COUNT(platform_order_code) AS fdnc_share,
-      COUNT(CASE WHEN vendor_price_mechanisms.vendor_hAS_customer_area THEN platform_order_code END)/COUNT(platform_order_code) AS customer_location_share,
-      COUNT(CASE WHEN vendor_price_scheme_type='Experiment' THEN platform_order_code END) AS test_orders, #cambiar de ordenes a usuarios y vENDedores expuestos al test
+      COUNT(CASE WHEN vendor_price_mechanisms.vendor_has_time_condition THEN platform_order_code END)/COUNT(platform_order_code) AS tod_share,
+      COUNT(CASE WHEN vendor_price_mechanisms.vendor_has_customer_condition THEN platform_order_code END)/COUNT(platform_order_code) AS fdnc_share,
+      COUNT(CASE WHEN vendor_price_mechanisms.vendor_has_customer_area THEN platform_order_code END)/COUNT(platform_order_code) AS customer_location_share,
+      COUNT(CASE WHEN vendor_price_scheme_type='Experiment' THEN platform_order_code END) AS test_orders, #cambiar de ordenes a usuarios y vendedores expuestos al test
       COUNT(CASE when vendor_price_scheme_type='Experiment' THEN platform_order_code END)/COUNT(platform_order_code) AS test_orders_share
     
     FROM `fulfillment-dwh-production.cl._dps_orders_with_pricing_mechanism` p
@@ -212,32 +211,22 @@ SELECT
     AND entity_id is not null 
     AND region is not null
     AND entity_id != 'FP_DE'
-    AND vertical_type IN ('restaurants', 'restaurant', 'coffee', 'street_food')
-    AND vertical_type NOT IN ('courier', 'courier_business') 
+    AND vertical_type IN ('restaurants', 'restaurant', 'coffee', 'street_food') 
     GROUP BY ALL
 )
 
 ,tests AS (
-  WITH base as(
     SELECT
-      region,
       entity_id,
       date(date_trunc(test_start_date, MONTH)) month,
       COUNT(DISTINCT CASE WHEN is_test_config_good = TRUE THEN test_name ELSE null END) AS valid_tests,#porcentaje de tiempo de test activos
-      COUNT(DISTINCT test_name) AS test_all_entities_count #cantidad distinta de test activos
+      COUNT(DISTINCT test_name) AS test_all_entities_count_cum #cantidad distinta de test activos
     FROM `fulfillment-dwh-production.cl._dps_experiment_configuration_versions` t
     WHERE TRUE
     AND date(t.test_start_date) >= DATE_SUB(start_date_filter, INTERVAL 2 DAY)
     AND date(t.test_start_date) < DATE_ADD(end_date_filter, INTERVAL 2 DAY)
     AND parent_vertical_flags.is_restaurant
     GROUP BY 1,2,3
-  )
-  SELECT
-  b.entity_id,
-  b.month,
-  SUM(valid_tests) OVER (PARTITION BY b.entity_id, b.region, b.month) AS test_all_valid_tests,
-  SUM(test_all_entities_count) OVER(PARTITION BY b.entity_id, b.region, b.month) AS test_all_entities_count_cum
-  FROM base b
 )
 
 ,avg_kpi AS (
