@@ -22,7 +22,7 @@
 
 
   ######## SET RUN MODE
-  SET backfill = FALSE;
+  SET backfill = TRUE;
 
   ######## SET END DATE
   SET end_date_filter = CURRENT_DATE();
@@ -127,7 +127,7 @@ SELECT
     SUM(dps_surge_fee_eur)/COUNT(DISTINCT platform_order_code) surge_fee_eur,
     SUM(service_fee_eur)/COUNT(DISTINCT platform_order_code) sf_eur,
     SUM(mov_customer_fee_eur)/COUNT(DISTINCT platform_order_code) sbf_eur,
-    SAFE_DIVIDE(SUM(delivery_fee_eur+service_fee_eur+mov_customer_fee_eur+priority_fee_eur IGNORE NULLS),COUNT(DISTINCT platform_order_code)) cf_eur,
+    SAFE_DIVIDE(SUM(IFNULL(delivery_fee_eur,0) + IFNULL(service_fee_eur,0) + IFNULL(mov_customer_fee_eur,0)+ IFNULL(priority_fee_eur,0)),COUNT(DISTINCT platform_order_code)) cf_eur,
     SUM(dps_minimum_order_value_eur)/COUNT(DISTINCT platform_order_code) mov_eur,
     SUM(commission_eur)/COUNT(DISTINCT platform_order_code) comm_eur,
     SUM(joker_vendor_fee_eur)/COUNT(DISTINCT platform_order_code) joker_eur,
@@ -219,14 +219,14 @@ SELECT
     SELECT
       entity_id,
       date(date_trunc(test_start_date, MONTH)) month,
-      COUNT(DISTINCT CASE WHEN is_test_config_good = TRUE THEN test_name ELSE null END) AS valid_tests,#porcentaje de tiempo de test activos
+      COUNT(DISTINCT CASE WHEN is_test_config_good = TRUE THEN test_name ELSE null END) AS test_all_valid_tests,#porcentaje de tiempo de test activos
       COUNT(DISTINCT test_name) AS test_all_entities_count_cum #cantidad distinta de test activos
     FROM `fulfillment-dwh-production.cl._dps_experiment_configuration_versions` t
     WHERE TRUE
     AND date(t.test_start_date) >= DATE_SUB(start_date_filter, INTERVAL 2 DAY)
     AND date(t.test_start_date) < DATE_ADD(end_date_filter, INTERVAL 2 DAY)
     AND parent_vertical_flags.is_restaurant
-    GROUP BY 1,2,3
+    GROUP BY ALL
 )
 
 ,avg_kpi AS (
