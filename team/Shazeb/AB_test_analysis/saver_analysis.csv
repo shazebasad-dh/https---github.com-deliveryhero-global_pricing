@@ -1,0 +1,31 @@
+,country,entity_id,variant,category,target_group,total_orders,total_revenue,delivery_costs_eur,total_commission,total_delivery_fee_eur,total_profit,cm_per_user,orders_per_user,avg_revenue,avg_delivery_cost,avg_profit,avg_df,avg_commission,avg_delivery_distance
+0,Austria,MJM_AT,Control,priority,ALL Chains,5235,73012,29060,41837,16381,43951,22.86,2.72,13.95,5.55,8.4,3.13,7.99,2.41
+1,Austria,MJM_AT,Variation1,priority,ALL Chains,5895,83639,32346,48179,18737,51292,22.99,2.64,14.19,5.49,8.7,3.18,8.17,2.45
+2,Austria,MJM_AT,Variation1,saver,ALL Chains,4358,40839,18907,27106,10719,21931,6.2,1.23,9.37,4.34,5.03,2.46,6.22,2.12
+3,Austria,MJM_AT,Control,standard,ALL Chains,172169,1603415,819583,1057446,474221,783831,19.51,4.29,9.31,4.76,4.55,2.75,6.14,2.05
+4,Austria,MJM_AT,Variation1,standard,ALL Chains,166831,1546716,790737,1020723,458019,755979,19.24,4.25,9.27,4.74,4.53,2.75,6.12,2.04
+5,Austria,MJM_AT,Control,priority,Chains in targeting,3691,55198,20158,32737,11436,35040,21.72,2.29,14.95,5.46,9.49,3.1,8.87,2.59
+6,Austria,MJM_AT,Variation1,priority,Chains in targeting,4220,63883,22706,38003,13324,41177,21.46,2.2,15.14,5.38,9.76,3.16,9.01,2.6
+7,Austria,MJM_AT,Variation1,saver,Chains in targeting,4357,40835,18902,27103,10718,21932,6.21,1.23,9.37,4.34,5.03,2.46,6.22,2.12
+8,Austria,MJM_AT,Control,standard,Chains in targeting,132951,1300409,625511,869399,361249,674897,17.0,3.35,9.78,4.7,5.08,2.72,6.54,2.13
+9,Austria,MJM_AT,Variation1,standard,Chains in targeting,127347,1242569,596315,831427,344678,646253,16.76,3.3,9.76,4.68,5.07,2.71,6.53,2.12
+10,Austria,MJM_AT,Control,priority,Chains not in targeting,1544,17813,8901,9099,4945,8911,11.6,2.01,11.54,5.77,5.77,3.2,5.89,1.99
+11,Austria,MJM_AT,Variation1,priority,Chains not in targeting,1675,19755,9639,10175,5412,10115,12.5,2.07,11.79,5.76,6.04,3.23,6.07,2.06
+12,Austria,MJM_AT,Variation1,saver,Chains not in targeting,1,4,4,3,0,0,-0.17,1.0,4.33,4.5,-0.17,0.79,3.35,0.63
+13,Austria,MJM_AT,Control,standard,Chains not in targeting,39218,303006,194071,188047,112972,108934,6.88,2.48,7.73,4.95,2.78,2.88,4.79,1.77
+14,Austria,MJM_AT,Variation1,standard,Chains not in targeting,39484,304147,194421,189295,113340,109725,6.87,2.47,7.7,4.92,2.78,2.87,4.79,1.76
+15,Finland,PO_FI,Control,priority,ALL Chains,993,11103,6727,4960,3607,4376,9.1,2.06,11.18,6.77,4.41,3.63,5.0,2.86
+16,Finland,PO_FI,Variation1,priority,ALL Chains,1103,12277,7238,5386,3821,5039,8.51,1.86,11.13,6.56,4.57,3.47,4.88,2.83
+17,Finland,PO_FI,Variation1,saver,ALL Chains,1228,12465,6979,5678,3749,5486,5.1,1.14,10.15,5.68,4.47,3.05,4.62,2.54
+18,Finland,PO_FI,Control,standard,ALL Chains,34497,316033,201219,148888,104176,114813,8.74,2.63,9.16,5.83,3.33,3.02,4.32,2.26
+19,Finland,PO_FI,Variation1,standard,ALL Chains,32549,295647,190033,140100,97186,105614,8.45,2.6,9.08,5.84,3.24,2.99,4.3,2.25
+20,Finland,PO_FI,Control,priority,Chains in targeting,637,8407,4630,4131,2459,3777,9.68,1.63,13.2,7.27,5.93,3.86,6.49,3.24
+21,Finland,PO_FI,Variation1,priority,Chains in targeting,768,9624,5267,4512,2736,4357,8.86,1.56,12.53,6.86,5.67,3.56,5.88,3.1
+22,Finland,PO_FI,Variation1,saver,Chains in targeting,1202,12264,6811,5604,3667,5452,5.18,1.14,10.2,5.67,4.54,3.05,4.66,2.54
+23,Finland,PO_FI,Control,standard,Chains in targeting,26236,267888,157295,130880,81492,110592,8.71,2.07,10.21,6.0,4.22,3.11,4.99,2.4
+24,Finland,PO_FI,Variation1,standard,Chains in targeting,24731,250153,148230,122783,75857,101923,8.5,2.06,10.11,5.99,4.12,3.07,4.96,2.39
+25,Finland,PO_FI,Control,priority,Chains not in targeting,356,2696,2096,829,1148,599,3.22,1.91,7.57,5.89,1.68,3.23,2.33,2.18
+26,Finland,PO_FI,Variation1,priority,Chains not in targeting,335,2653,1971,873,1085,682,3.57,1.75,7.92,5.89,2.04,3.24,2.61,2.2
+27,Finland,PO_FI,Variation1,saver,Chains not in targeting,26,201,167,73,81,33,1.29,1.0,7.74,6.44,1.29,3.13,2.84,2.48
+28,Finland,PO_FI,Control,standard,Chains not in targeting,8261,48145,43923,18007,22683,4221,1.08,2.11,5.83,5.32,0.51,2.75,2.18,1.8
+29,Finland,PO_FI,Variation1,standard,Chains not in targeting,7818,45494,41803,17316,21329,3690,0.96,2.04,5.82,5.35,0.47,2.73,2.21,1.81
