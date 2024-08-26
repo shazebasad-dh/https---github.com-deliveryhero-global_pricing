@@ -1,0 +1,13 @@
+{
+    "sqltools.connections": [
+        {
+            "name": "BigQuery",
+            "authenticator": "CLI",
+            "location": "us",
+            "previewLimit": 50,
+            "driver": "BigQuery",
+            "projectId": "\"logistics-customer-staging\""
+        }
+    ],
+    "sqltools.useNodeRuntime": true
+}
