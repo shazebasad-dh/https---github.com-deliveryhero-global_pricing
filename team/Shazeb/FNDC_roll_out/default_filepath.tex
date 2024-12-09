@@ -1,0 +1,39 @@
+\documentclass{article}%
+\usepackage[T1]{fontenc}%
+\usepackage[utf8]{inputenc}%
+\usepackage{lmodern}%
+\usepackage{textcomp}%
+\usepackage{lastpage}%
+%
+%
+%
+\begin{document}%
+\normalsize%
+\section{Regression Results}%
+\label{sec:RegressionResults}%
+
+    \begin{table}[!htbp] \centering
+    \begin{tabular}{@{\extracolsep{5pt}}lccccccc}
+    \\[-1.8ex]\hline
+    \hline \\[-1.8ex]
+    \\[-1.8ex] & (1) & (2) & (3) & (4) & (5) & (6) & (7) \\
+    \hline \\[-1.8ex]
+     pre_trend_diff & -5110.430$^{}$ & -200.900$^{}$ & -482.750$^{}$ & -2783.150$^{}$ & -0.075$^{***}$ & 0.004$^{***}$ & -0.022$^{**}$ \\
+    & (2905.682) & (483.466) & (283.066) & (2012.302) & (0.010) & (0.000) & (0.009) \\
+     treated & 23163.905$^{}$ & 11733.575$^{**}$ & 5490.444$^{**}$ & 22394.908$^{}$ & -0.618$^{***}$ & 0.026$^{***}$ & 0.026$^{}$ \\
+    & (19590.153) & (4015.891) & (2399.818) & (15178.909) & (0.123) & (0.003) & (0.045) \\
+    \hline \\[-1.8ex]
+     Observations & 32 & 32 & 32 & 32 & 32 & 32 & 32 \\
+     N. of groups & 2 & 2 & 2 & 2 & 2 & 2 & 2 \\
+     $R^2$ & 0.477 & 0.575 & 0.538 & 0.472 & 0.604 & 0.827 & 0.627 \\
+     Residual Std. Error & 18660.892 (df=13) & 4888.451 (df=13) & 2979.751 (df=13) & 13715.341 (df=13) & 0.168 (df=13) & 0.007 (df=13) & 0.056 (df=13) \\
+     F Statistic & 5.926$^{**}$ (df=19; 13) & 8.779$^{***}$ (df=19; 13) & 7.577$^{***}$ (df=19; 13) & 5.815$^{**}$ (df=19; 13) & 9.910$^{***}$ (df=19; 13) & 31.055$^{***}$ (df=19; 13) & 10.923$^{***}$ (df=19; 13) \\
+    \hline
+    \hline \\[-1.8ex]
+    \textit{Note:} & \multicolumn{7}{r}{$^{*}$p$<$0.1; $^{**}$p$<$0.05; $^{***}$p$<$0.01} \\
+    \end{tabular}
+    \end{table}
+    
+
+%
+\end{document}
