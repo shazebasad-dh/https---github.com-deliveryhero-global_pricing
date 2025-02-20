@@ -1,0 +1,58 @@
+Region,Country,entity_id,small,medium,large,Release Date,Release Status,Comment
+EU,SE,OP_SE,,TRUE,,1/8/2025,Completed,-
+EU,CZ,DJ_CZ,,TRUE,,1/7/2025,Completed,-
+EU,HU,NP_HU,,TRUE,,1/2/2025,Completed,-
+EU,NO,FO_NO,,TRUE,,1/7/2025,Completed,-
+EU,AT,MJM_AT,,TRUE,,1/7/2025,Completed,-
+EU,CY,FY_CY,TRUE,,,1/6/2025,Completed,-
+EU,FI,PO_FI,TRUE,,,1/13/2025,Completed,"Due to bug, this was rereleased on 13 Jan"
+EU,GR,EF_GR,TRUE,,,1/8/2025,Completed,-
+EU,TR,YS_TR,,,,1/14/2025,Not Started,-
+APAC,TW,FP_TW,,,TRUE,1/9/2025,Completed,-
+APAC,TH,FP_TH,,TRUE,,1/14/2025,Not Started,-
+APAC,BD,FP_BD,TRUE,,,1/14/2025,Not Started,-
+APAC,PH,FP_PH,,,TRUE,1/9/2025,Completed,-
+APAC,MY,FP_MY,,,TRUE,1/7/2025,Completed,-
+APAC,SG,FP_SG,,TRUE,,1/2/2025,Completed,-
+APAC,PK,FP_PK,,TRUE,,1/7/2025,Completed,-
+APAC,MM,FP_MM,TRUE,,,1/6/2025,Completed,-
+APAC,LA,FP_LA,TRUE,,,1/6/2025,Completed,-
+MENA,AE,TB_AE,,,TRUE,1/8/2025,Completed,-
+MENA,KW,TB_KW,,,TRUE,1/15/2025,Not Started,-
+MENA,QA,TB_QA,,,TRUE,1/15/2025,Not Started,-
+MENA,SA,HS_SA,,TRUE,,1/7/2025,Completed,-
+MENA,EG,HF_EG,,TRUE,,1/2/2025,Completed,-
+MENA,JO,TB_JO,TRUE,,,1/15/2025,Not Started,-
+MENA,BH,TB_BH,TRUE,,,1/6/2025,Completed,-
+MENA,IQ,TB_IQ,TRUE,,,1/7/2025,Completed,-
+MENA,OM,TB_OM,,TRUE,,1/15/2025,Not Started,-
+LATAM,AR,PY_AR,,,TRUE,1/9/2025,Completed,-
+LATAM,CL,PY_CL,,TRUE,,1/2/2025,Completed,-
+LATAM,PE,PY_PE,,TRUE,,1/7/2025,Completed,-
+LATAM,BO,PY_BO,TRUE,,,1/6/2025,Completed,-
+LATAM,CR,PY_CR,TRUE,,,1/6/2025,Completed,-
+LATAM,DO,PY_DO,TRUE,,,1/7/2025,Completed,-
+LATAM,EC,PY_EC,TRUE,,,1/7/2025,Completed,-
+LATAM,GT,PY_GT,TRUE,,,1/9/2025,Completed,-
+LATAM,HN,PY_HN,TRUE,,,1/9/2025,Completed,-
+LATAM,NI,PY_NI,TRUE,,,1/9/2025,Completed,-
+LATAM,PA,AP_PA,TRUE,,,1/10/2025,Completed,-
+LATAM,PY,PY_PY,TRUE,,,1/9/2025,Completed,-
+LATAM,SV,PY_SV,TRUE,,,1/9/2025,Completed,-
+LATAM,UY,PY_UY,TRUE,,,1/9/2025,Completed,-
+LATAM,VE,PY_VE,TRUE,,,1/9/2025,Completed,-
+GLOVO,MA,GV_MA,,TRUE,,1/2/2025,Completed,-
+GLOVO,RO,GV_RO,,TRUE,,1/7/2025,Completed,-
+GLOVO,BG,GV_BG,TRUE,,,1/6/2025,Completed,-
+GLOVO,BA,GV_BA,TRUE,,,1/6/2025,Completed,-
+GLOVO,CI,GV_CI,TRUE,,,1/7/2025,Completed,-
+GLOVO,HR,GV_HR,TRUE,,,1/7/2025,Completed,-
+GLOVO,KE,GV_KE,TRUE,,,1/9/2025,Completed,-
+GLOVO,MD,GV_MD,TRUE,,,1/9/2025,Completed,-
+GLOVO,ME,GV_ME,TRUE,,,1/9/2025,Completed,-
+GLOVO,NG,GV_NG,TRUE,,,1/9/2025,Completed,-
+GLOVO,PT,GV_PT,TRUE,,,3/3/2025,24 Feb Snapshot,-
+GLOVO,RS,GV_RS,TRUE,,,1/9/2025,Completed,-
+GLOVO,TN,GV_TN,TRUE,,,1/9/2025,Completed,-
+GLOVO,UG,GV_UG,TRUE,,,1/9/2025,Completed,-
+,,, ,,,,,
