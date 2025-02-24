@@ -32,7 +32,7 @@ jobs:
           from google.auth.transport.requests import Request
           import os
           import json
-
+      
           # Authenticate using GitHub secrets
           credentials = Credentials(
               token=None,
@@ -41,18 +41,12 @@ jobs:
               refresh_token=os.environ['GOOGLE_REFRESH_TOKEN'],
               token_uri='https://oauth2.googleapis.com/token'
           )
-
+      
           # Refresh the credentials if necessary
           if credentials.expired and credentials.refresh_token:
               credentials.refresh(Request())
-
-          # Save credentials to a file
-          credentials_file = '/tmp/credentials.json'
-          with open(credentials_file, 'w') as f:
-              json.dump(credentials_to_dict(credentials), f)
-
-          print(f'Credentials saved to {credentials_file}')
-          
+      
+          # Function to convert credentials to dictionary for saving
           def credentials_to_dict(credentials):
               return {
                   'token': credentials.token,
@@ -62,6 +56,13 @@ jobs:
                   'client_secret': credentials.client_secret,
                   'scopes': credentials.scopes,
               }
+      
+          # Save credentials to a file
+          credentials_file = '/tmp/credentials.json'
+          with open(credentials_file, 'w') as f:
+              json.dump(credentials_to_dict(credentials), f)
+      
+          print(f'Credentials saved to {credentials_file}')
           "
       - name: Run Jupyter notebook
         run: |
