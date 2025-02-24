@@ -70,4 +70,4 @@ jobs:
           pip install jupyter
           
           # Run your notebook
-          jupyter nbconvert --to notebook --execute team/Shazeb/Holdout_group/test_automation.ipynb
+          jupyter nbconvert --to notebook --execute team/Shazeb/Holdout_group/holdout_pipeline.ipynb
