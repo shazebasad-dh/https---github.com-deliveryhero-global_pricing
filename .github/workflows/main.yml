@@ -22,4 +22,4 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Execute notebook
-        run: papermill scripts/your_notebook.ipynb /dev/null # Adjusted path
+        run: papermill team/Shazeb/Holdout_group/holdout_pipeline.ipynb /dev/null # Adjusted path
