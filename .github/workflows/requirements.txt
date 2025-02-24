@@ -1,1 +1,17 @@
+numpy
 pandas
+google
+matplotlib
+seaborn
+scipy
+plotly 
+db_dtypes
+bigframes
+IPython
+math
+statsmodels
+typing
+logging
+sys
+datetime import datetime, timedelta
+time
