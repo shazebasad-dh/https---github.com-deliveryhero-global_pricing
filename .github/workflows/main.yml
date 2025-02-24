@@ -21,11 +21,34 @@ jobs:
       - name: Install dependencies
         run: pip install -r.github/workflows/requirements.txt
 
-      - name: Authenticate with Google Cloud
+      - name: Set up authentication with Google
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REFRESH_TOKEN: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
         run: |
-          echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-credentials.json
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-credentials.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS is set to: $GOOGLE_APPLICATION_CREDENTIALS"
+          python -c "
+          from google.oauth2.credentials import Credentials
+          from google.auth.transport.requests import Request
+          import os
+
+          # Authenticate using GitHub secrets
+          credentials = Credentials(
+              token=None,
+              client_id=os.environ['GOOGLE_CLIENT_ID'],
+              client_secret=os.environ['GOOGLE_CLIENT_SECRET'],
+              refresh_token=os.environ['GOOGLE_REFRESH_TOKEN'],
+              token_uri='https://oauth2.googleapis.com/token'
+          )
+
+          # Refresh the credentials if necessary
+          if credentials.expired and credentials.refresh_token:
+              credentials.refresh(Request())
+
+          # Now that we have authenticated, we can use the credentials
+          print('Successfully authenticated!')
+          "
+
 
       - name: Run Jupyter notebook
         run: |
