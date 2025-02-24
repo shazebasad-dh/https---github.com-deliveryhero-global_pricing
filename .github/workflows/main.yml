@@ -21,23 +21,24 @@ jobs:
       - name: Install dependencies
         run: pip install -r.github/workflows/requirements.txt
 
-      - name: Authenticate with Google Cloud
+      - name: Authenticate with Google Cloud OAuth2 credentials
         run: |
-          # Write the credentials to a temporary file
-          echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-key.json
-      
-          # Set GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-key.json"
-      
-          # Debugging: Ensure the environment variable is correctly set
-          echo "GOOGLE_APPLICATION_CREDENTIALS is set to: $GOOGLE_APPLICATION_CREDENTIALS"
-      
-          # Optionally, make this variable available to later steps
-          echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS" >> $GITHUB_ENV
+          # Install the necessary libraries
+          pip install google-auth google-auth-oauthlib google-auth-httplib2
 
-      - name: Install Google Cloud Libraries
+          # Save the credentials to a temporary file
+          echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > /tmp/gcp-credentials.json
+
+          # Set GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the saved credentials file
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-credentials.json"
+
+          # Optionally, ensure this environment variable is available in future steps
+          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json" >> $GITHUB_ENV
+
+      - name: Run Jupyter notebook
         run: |
-          pip install google-cloud-storage google-cloud-bigquery google-auth
-
-      - name: Execute notebook
-        run: papermill team/Shazeb/Holdout_group/holdout_pipeline.ipynb /dev/null # Adjusted path
+          # Install jupyter if not installed
+          pip install jupyter
+          
+          # Run your notebook
+          jupyter nbconvert --to notebook --execute team/Shazeb/Holdout_group/holdout_pipeline.ipynb
