@@ -21,5 +21,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r.github/workflows/requirements.txt
 
+      - name: Authenticate with Google Cloud
+        run: |
+          echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-key.json
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-key.json"
+
       - name: Execute notebook
         run: papermill team/Shazeb/Holdout_group/holdout_pipeline.ipynb /dev/null # Adjusted path
