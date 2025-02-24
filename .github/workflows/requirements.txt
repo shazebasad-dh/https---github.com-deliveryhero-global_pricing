@@ -11,6 +11,5 @@ IPython
 statsmodels
 typing
 logging
-sys
 datetime
 time
