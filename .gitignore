@@ -3,4 +3,5 @@
 *.bat
 shape_files/
 customer_location/gadm.log
+config/credentials.json
 __pycache__
