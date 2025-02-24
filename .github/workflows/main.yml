@@ -19,7 +19,7 @@ jobs:
           python-version: '3.9' # Or your desired Python version
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r.github/workflows/requirements.txt
 
       - name: Execute notebook
         run: papermill team/Shazeb/Holdout_group/holdout_pipeline.ipynb /dev/null # Adjusted path
