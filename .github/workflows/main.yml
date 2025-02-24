@@ -24,8 +24,7 @@ jobs:
       - name: Authenticate with Google Cloud
         run: |
           echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-key.json
-          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-key.json"
-          echo "GOOGLE_APPLICATION_CREDENTIALS is set to: $GOOGLE_APPLICATION_CREDENTIALS"
+          export GCP_CREDENTIALS_JSON=$(cat /tmp/gcp-key.json)
 
       - name: Install Google Cloud Libraries
         run: |
