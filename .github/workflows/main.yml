@@ -25,6 +25,11 @@ jobs:
         run: |
           echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-key.json
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS is set to: $GOOGLE_APPLICATION_CREDENTIALS"
+
+      - name: Install Google Cloud Libraries
+        run: |
+          pip install google-cloud-storage google-cloud-bigquery google-auth
 
       - name: Execute notebook
         run: papermill team/Shazeb/Holdout_group/holdout_pipeline.ipynb /dev/null # Adjusted path
