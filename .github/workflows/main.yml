@@ -23,9 +23,17 @@ jobs:
 
       - name: Authenticate with Google Cloud
         run: |
+          # Write the credentials to a temporary file
           echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-key.json
-          export GCP_CREDENTIALS_JSON=$(cat /tmp/gcp-key.json)
-          echo "GOOGLE_CLOUD_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}" >> $GITHUB_ENV
+      
+          # Set GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the file
+          export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-key.json"
+      
+          # Debugging: Ensure the environment variable is correctly set
+          echo "GOOGLE_APPLICATION_CREDENTIALS is set to: $GOOGLE_APPLICATION_CREDENTIALS"
+      
+          # Optionally, make this variable available to later steps
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$GOOGLE_APPLICATION_CREDENTIALS" >> $GITHUB_ENV
 
       - name: Install Google Cloud Libraries
         run: |
