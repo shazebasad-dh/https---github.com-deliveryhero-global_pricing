@@ -21,19 +21,11 @@ jobs:
       - name: Install dependencies
         run: pip install -r.github/workflows/requirements.txt
 
-      - name: Authenticate with Google Cloud OAuth2 credentials
+      - name: Authenticate with Google Cloud
         run: |
-          # Install the necessary libraries
-          pip install google-auth google-auth-oauthlib google-auth-httplib2
-
-          # Save the credentials to a temporary file
-          echo "${{ secrets.GCP_CREDENTIALS_JSON }}" > /tmp/gcp-credentials.json
-
-          # Set GOOGLE_APPLICATION_CREDENTIALS environment variable to point to the saved credentials file
+          echo "${{ secrets.GCP_CREDENTIALS }}" > /tmp/gcp-credentials.json
           export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcp-credentials.json"
-
-          # Optionally, ensure this environment variable is available in future steps
-          echo "GOOGLE_APPLICATION_CREDENTIALS=/tmp/gcp-credentials.json" >> $GITHUB_ENV
+          echo "GOOGLE_APPLICATION_CREDENTIALS is set to: $GOOGLE_APPLICATION_CREDENTIALS"
 
       - name: Run Jupyter notebook
         run: |
