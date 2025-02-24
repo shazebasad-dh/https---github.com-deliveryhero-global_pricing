@@ -1,0 +1,31 @@
+name: Run Jupyter Notebook
+
+on:
+  schedule:
+    - cron: '0 */2 * * *' # Runs every hour
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: '3.9' # Or your desired Python version
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Execute notebook
+        run: papermill your_notebook.ipynb output_notebook.ipynb
+
+      - name: Upload output notebook as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: output-notebook
+          path: output_notebook.ipynb
