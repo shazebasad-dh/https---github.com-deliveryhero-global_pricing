@@ -8,7 +8,6 @@ plotly
 db_dtypes
 bigframes
 IPython
-math
 statsmodels
 typing
 logging
