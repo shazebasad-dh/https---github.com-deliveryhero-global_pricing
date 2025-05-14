@@ -1,7 +1,7 @@
 import logging
 from datetime import date
 import sys
-from pipelines.historical_pipeline import store_data_historically
+from pricing_performance_holdouts.pipelines.historical_pipeline import store_data_historically
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
