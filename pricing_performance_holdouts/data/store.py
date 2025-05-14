@@ -93,8 +93,8 @@ def store_data_cloud(df: pd.DataFrame,
         df_week = df[df['as_of_date'] == week]
 
         if save_local:
-            output_dir = Path(__file__).resolve().parent.parent / "outputs"
-            output_dir.mkdir(parents=True, exist_ok=True)   # create outputs folder if missing
+            output_dir = Path(__file__).resolve().parent.parent / "outputs" / "raw_data"
+            output_dir.mkdir(parents=True, exist_ok=True)
 
             local_file = output_dir / f"cuped_holdout_as_of_{week}.parquet"
             df_week.to_parquet(local_file, engine="fastparquet", index=False)
