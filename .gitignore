@@ -1,6 +1,7 @@
 .DS_Store
 *.ini
 *.bat
+*.parquet
 shape_files/
 customer_location/gadm.log
 config/credentials.json
