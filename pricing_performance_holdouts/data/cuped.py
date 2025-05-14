@@ -87,7 +87,7 @@ def apply_cuped_adjustment(df: pd.DataFrame,
 
                 for pre_metric, post_metric in pre_post_metric_pairs:
                     try:
-                        tmp_group = cuped_adjustment_raw(tmp_group, pre_metric, post_metric)
+                        tmp_group = cuped_adjustment(tmp_group, pre_metric, post_metric)
                     except Exception as e:
                         logger.warning(f"⚠️ Error in CUPED for Entity {entity_id}, Week {as_of_date}: {e}")
                         continue
