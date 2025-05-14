@@ -75,3 +75,23 @@ def apply_cleanup(df: pd.DataFrame) -> pd.DataFrame:
     logger.info(f"apply_cleanup(): {initial_rows - final_rows} rows removed. Final dataset size: {final_rows}")
 
     return raw_data_final
+
+def convert_dtypes(df: pd.DataFrame, dtype_map: dict) -> pd.DataFrame:
+    
+    """
+    Convert columns in DataFrame to specified data types.
+
+    Args:
+        df (pd.DataFrame): DataFrame to convert.
+        dtype_map (dict): Dictionary of column names and target data types.
+
+    Returns:
+        pd.DataFrame: DataFrame with updated dtypes.
+    """
+    for col, dtype in dtype_map.items():
+        if col in df.columns:
+            try:
+                df[col] = df[col].astype(dtype)
+            except Exception as e:
+                logging.warning(f"Could not convert column {col} to {dtype}: {e}")
+    return df
