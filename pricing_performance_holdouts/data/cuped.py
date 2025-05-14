@@ -10,8 +10,6 @@ logger = logging.getLogger(__name__)
 # Apply CUPED
 # ------------------------------------------------------------------------------
 
-
-
 def cuped_adjustment(df: pd.DataFrame,
                          pre_metric: str,
                          post_metric: str) -> pd.DataFrame:
