@@ -5,6 +5,8 @@ from tqdm.auto import tqdm
 import io
 import logging
 from typing import List
+from pathlib import Path
+
 
 logger = logging.getLogger(__name__)
 
@@ -84,14 +86,18 @@ def store_data_cloud(df: pd.DataFrame,
     storage_client = storage.Client(project=PROJECT_ID)
     bucket = storage_client.bucket(GCS_BUCKET_NAME)
    
-    for i in tqdm(week_dates, desc= 'Week', position=0):
+    for week in tqdm(week_dates, desc= 'Week', position=0):
     
-        GCS_PARQUET_PATH = f"parquet_files/cuped_holdout_as_of_{i}.parquet" 
+        GCS_PARQUET_PATH = f"parquet_files/cuped_holdout_as_of_{week}.parquet" 
         
-        df_week = df[df['as_of_date'] == i]
+        df_week = df[df['as_of_date'] == week]
 
         if save_local:
-            df_week.to_parquet(f"cuped_holdout_as_of_{i}.parquet", engine="fastparquet", index=False)
+            output_dir = Path(__file__).resolve().parent.parent / "outputs"
+            output_dir.mkdir(parents=True, exist_ok=True)   # create outputs folder if missing
+
+            local_file = output_dir / f"cuped_holdout_as_of_{week}.parquet"
+            df_week.to_parquet(local_file, engine="fastparquet", index=False)
 
         if save_cloud_storage:
             upload_parquet_to_gcs(df_week, bucket, GCS_PARQUET_PATH, overwrite=True)
