@@ -7,6 +7,7 @@ from google.oauth2.credentials import Credentials
 from google.auth import default
 from datetime import date, timedelta
 import pandas as pd
+import numpy as np
 import time
 from typing import Optional, List
 
