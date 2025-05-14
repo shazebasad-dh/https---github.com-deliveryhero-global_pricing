@@ -1,13 +1,13 @@
 from datetime import date, timedelta
 import pandas as pd
 import logging
-from data.extract import initialize_bigquery_client, extract_data
-from data.bigquery_queries import get_marketing_data, get_dps_data
-from data.transform import apply_cleanup
-from data.transform import convert_dtypes
-from data.cuped import apply_cuped_adjustment
-from data.store import store_data_cloud
-from utils.dates import get_iso_week_mondays
+from pricing_performance_holdouts.data.extract import initialize_bigquery_client, extract_data
+from pricing_performance_holdouts.data.bigquery_queries import get_marketing_data, get_dps_data
+from pricing_performance_holdouts.data.transform import apply_cleanup
+from pricing_performance_holdouts.data.transform import convert_dtypes
+from pricing_performance_holdouts.data.cuped import apply_cuped_adjustment
+from pricing_performance_holdouts.data.store import store_data_cloud
+from pricing_performance_holdouts.utils.dates import get_iso_week_mondays
 
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,8 @@ def store_data_historically(project_id: str,
             "orders_pre": int,
             "orders_post": int,
             "analytical_profit_pre": float,
-            "analytical_profit_post": float
+            "analytical_profit_post": float,
+            "as_of_date": "datetime64[ns]"
         }
 
         df_clean_dtypes = convert_dtypes(df_clean, dtype_map)
