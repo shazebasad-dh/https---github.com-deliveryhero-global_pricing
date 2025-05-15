@@ -1,0 +1,20 @@
+# Google Cloud settings
+project_id: "logistics-customer-staging"
+gcs_bucket: "holdout_data"
+
+# Pipeline parameters
+entities:
+  - "FP_PK"
+  - "PY_DO"
+  - ""
+restaurant_flag: "IN"
+
+# Dates
+year: 2025
+min_date: "2025-02-01"
+max_date: null   # null = latest Monday
+
+# Output
+local_output_dir: "./outputs/raw_data"
+save_local: true
+save_cloud_storage: false
