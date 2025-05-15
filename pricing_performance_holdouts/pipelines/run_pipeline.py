@@ -26,7 +26,6 @@ def main():
         entities=entities,
         year=year,
         min_date=min_date,
-        max_date=max_date,
         restaurant_flag='IN',
         save_local=True
     )
