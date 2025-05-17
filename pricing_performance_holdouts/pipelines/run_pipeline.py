@@ -18,8 +18,8 @@ def main():
 
     year = 2025
 
-    min_date = date(2025, 2,2)    
-    #max_date = date(2025, 2, 15) 
+    min_date = date(2025, 2,14)    
+    max_date = date(2025, 2, 15) 
 
     store_data_historically(
         project_id=project_id,
