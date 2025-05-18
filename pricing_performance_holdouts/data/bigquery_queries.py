@@ -4,8 +4,8 @@ from typing import Union
 # Data Queries
 # ------------------------------------------------------------------------------
 
-def get_marketing_data(entities: Union[list, tuple], week: str, restaurant_flag: str) -> str:
-
+def get_marketing_data(entities: Union[list, tuple], week: str, vendor_vertical: tuple[str, ...]) -> str:
+    
     """
     SQL query to extract holdout and non holdout data from marketing (BIMA table) for given entities and week.
 
@@ -55,7 +55,7 @@ def get_marketing_data(entities: Union[list, tuple], week: str, restaurant_flag:
         AND dps.platform_order_code IS NOT NULL
         AND dps.is_own_delivery
         AND dps.is_sent
-        AND vendor_vertical_parent {restaurant_flag} ('Restaurant','restaurant','restaurants')
+        AND vendor_vertical_parent IN {vendor_vertical}
         AND dps.entity_id in {entities}
     GROUP BY 1, 2
     ), 
@@ -113,7 +113,7 @@ def get_marketing_data(entities: Union[list, tuple], week: str, restaurant_flag:
     return mkt_data
 
 
-def get_dps_data(entities: Union[list, tuple], week: str, restaurant_flag: str) -> str:
+def get_dps_data(entities: Union[list, tuple], week: str, vendor_vertical: tuple[str, ...]) -> str:
 
     """
     Generate SQL query to extract non holdout and holdout data from DPS tables for entities not in input list (not in marketing tables).
@@ -158,7 +158,7 @@ def get_dps_data(entities: Union[list, tuple], week: str, restaurant_flag: str) 
         AND dps.platform_order_code IS NOT NULL
         AND dps.is_own_delivery
         AND dps.is_sent
-        AND vendor_vertical_parent {restaurant_flag} ('Restaurant','restaurant','restaurants')
+        AND vendor_vertical_parent IN {vendor_vertical}
         AND dps.entity_id not in {entities}
     GROUP BY 1, 2
     ), 
