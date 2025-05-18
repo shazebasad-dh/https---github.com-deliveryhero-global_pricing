@@ -111,4 +111,62 @@ def store_data_cloud(df: pd.DataFrame,
             gcs_path = f"parquet_files/{folder_name}/{file_name}"
             upload_parquet_to_gcs(df_week, bucket, gcs_path, overwrite=overwrite)
 
+def store_profitable_growth(
+    results: list[tuple[str, pd.DataFrame]],
+    vertical_type: str,
+    group: str,
+    save_local: bool = True,
+    save_cloud_storage: bool = False,
+    gcs_bucket: str = "holdout_data",
+    project: str = "logistics-data-storage-staging",
+    overwrite: bool = True
+) -> None:
+    """
+    Store profitable growth results locally and/or to GCS.
+    
+    Args:
+        results: List of (week, df) tuples
+        vertical_type: 'restaurants' or 'quick_commerce'
+        group: Grouping column used (e.g., 'brand_name' or 'entity_id')
+        save_local: Save each DataFrame locally as a Parquet file
+        save_cloud_storage: Upload each DataFrame to GCS
+        gcs_bucket: GCS bucket name
+        project: GCP project ID
+        overwrite: If True, allows overwriting existing files in GCS
+    """
+    
+    if save_cloud_storage:
+        storage_client = storage.Client(project=project)
+        bucket = storage_client.bucket(gcs_bucket)
+
+    # Determine base output path based on group type
+    if group == 'entity_id':
+        base_folder = 'entity_profitable_growth'
+    elif group == 'brand_name':
+        base_folder = 'brand_profitable_growth'
+    else:
+        base_folder = 'other_profitable_growth'  # fallback for unknown groups
+
+    for week, df in results:
+        
+        file_name = f"profitable_growth_{week}.parquet"
+
+        if save_local:
+            output_dir = Path(__file__).resolve().parent.parent / "outputs" / base_folder / vertical_type
+            output_dir.mkdir(parents=True, exist_ok=True)
+            local_path = output_dir / file_name
+            df.to_parquet(local_path, index=False)
+            logger.info(f"Saved local file → {local_path}")
+
+        if save_cloud_storage:
+            gcs_path = f"parquet_files/{base_folder}/{vertical_type}/{file_name}"
+            blob = bucket.blob(gcs_path)
+
+            if not overwrite and blob.exists():
+                logger.warning(f"File {gcs_path} already exists in GCS. Skipping.")
+                continue
+
+            blob.upload_from_string(df.to_parquet(index=False), content_type='application/octet-stream')
+            logger.info(f"Uploaded to GCS → {gcs_path}")
+
 
