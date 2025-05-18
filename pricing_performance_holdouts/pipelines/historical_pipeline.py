@@ -61,7 +61,7 @@ def store_data_historically(project_id: str,
         df_raw["as_of_date"] = week
 
         df_clean = apply_cleanup(df_raw)
-
+            
         # Convert dtypes for all pre & post columns
         dtype_map = {
             "orders_pre": int,
