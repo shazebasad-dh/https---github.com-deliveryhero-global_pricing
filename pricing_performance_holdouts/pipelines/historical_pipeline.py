@@ -17,7 +17,7 @@ def store_data_historically(project_id: str,
                             year: int = 2025,
                             min_date: date = None,
                             max_date: date = None,
-                            restaurant_flag: str = 'IN',
+                            vertical = tuple[str, ...],
                             pre_post_metric_pairs: list = [("orders_pre", "orders_post"),
                                                            ("analytical_profit_pre", "analytical_profit_post")],
                             save_local: bool = True) -> None:
@@ -54,8 +54,8 @@ def store_data_historically(project_id: str,
         
         logger.info(f"Processing week: {week}")
 
-        mkt_query = get_marketing_data(entities, week, restaurant_flag=restaurant_flag)
-        dps_query = get_dps_data(entities, week, restaurant_flag=restaurant_flag)
+        mkt_query = get_marketing_data(entities, week, vendor_vertical=vertical)
+        dps_query = get_dps_data(entities, week, vendor_vertical=vertical)
 
         df_raw = extract_data(client, mkt_query, dps_query)
         df_raw["as_of_date"] = week
@@ -79,6 +79,7 @@ def store_data_historically(project_id: str,
 
     store_data_cloud(
         df=df_cuped,
+        vendor_vertical = vertical,
         week_dates=week_mondays,
         save_cloud_storage=False,
         save_local=save_local
