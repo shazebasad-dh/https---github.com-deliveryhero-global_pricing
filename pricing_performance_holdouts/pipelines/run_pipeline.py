@@ -18,14 +18,15 @@ def main():
 
     year = 2025
 
-    min_date = date(2025, 2,14)    
-    max_date = date(2025, 2, 15) 
+    min_date = date(2025, 5, 10)    
+    max_date = date(2025, 5, 15) 
 
     store_data_historically(
         project_id=project_id,
         entities=entities,
         year=year,
         min_date=min_date,
+        max_date = max_date,
         restaurant_flag='IN',
         save_local=True
     )
