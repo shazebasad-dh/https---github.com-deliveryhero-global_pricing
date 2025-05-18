@@ -1,11 +1,13 @@
 import logging
 from datetime import date
 import sys
-from pricing_performance_holdouts.pipelines.historical_pipeline import store_data_historically
+from pricing_performance_holdouts.pipelines.historical_pipeline import store_data_historical
+from pricing_performance_holdouts.pipelines.profitable_growth_pipeline import store_data_profitable_growth
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-def main():
+def run_historical_data_store():
     
     project_id = "logistics-customer-staging"
     #entities = ('FP_PK', 'PY_DO')
@@ -24,7 +26,7 @@ def main():
     min_date = date(2025, 5, 10)    
     max_date = date(2025, 5, 15)
 
-    store_data_historically(
+    store_data_historical(
         project_id=project_id,
         entities=entities,
         year=year,
@@ -33,6 +35,32 @@ def main():
         vertical= vendor_v,
         save_local=True
     )
+
+
+def run_profitable_growth_store():
+
+    w_no = ['2025-05-12']
+    vertical = 'restaurants'
+
+    return store_data_profitable_growth(weeks = w_no,vertical_type = vertical , group = 'entity_id')
+
+def main():
+    
+    #logging.info("Starting historical data storage step...")
+    #run_historical_data_store()
+
+    logging.info("Running profitable growth analysis...")
+    results = run_profitable_growth_store()
+
+    # Now you can view the output
+    for week, df in results:
+        print(f"\nResults for week {week}:")
+        print(df.head())
+    
+    #logging.info("Pipeline complete. Sample results:")
+    
+    #print(df_result.head())
+
 
 if __name__ == "__main__":
     main()
