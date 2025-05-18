@@ -90,7 +90,8 @@ def store_data_cloud(df: pd.DataFrame,
     
         GCS_PARQUET_PATH = f"parquet_files/cuped_holdout_as_of_{week}.parquet" 
         
-        df_week = df[df['as_of_date'] == week]
+        df_week = df[df['as_of_date'].dt.date == week]
+        logger.info(f"Saving week {week} → {len(df_week)} rows")
 
         if save_local:
             output_dir = Path(__file__).resolve().parent.parent / "outputs" / "raw_data"
