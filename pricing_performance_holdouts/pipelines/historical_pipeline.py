@@ -9,10 +9,9 @@ from pricing_performance_holdouts.data.cuped import apply_cuped_adjustment
 from pricing_performance_holdouts.data.store import store_data_cloud
 from pricing_performance_holdouts.utils.dates import get_iso_week_mondays
 
-
 logger = logging.getLogger(__name__)
 
-def store_data_historically(project_id: str,
+def store_data_historical(project_id: str,
                             entities: list,
                             year: int = 2025,
                             min_date: date = None,
