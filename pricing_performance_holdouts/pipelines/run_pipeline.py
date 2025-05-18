@@ -16,10 +16,13 @@ def main():
     'PY_HN', 'FP_MY' ,'FP_TH', 'FY_CY', 'PY_VE','PO_FI','TB_QA','TB_OM',
     'TB_KW','TB_JO','TB_IQ','TB_BH','TB_AE','HS_SA','FP_HK','FP_KH','HF_EG')))
 
+    #vendor_v = ('Restaurant','restaurant','restaurants')
+    vendor_v = ('supermarket', 'specialty','shops','shop','darkstores','Shop','Dmart')
+
     year = 2025
 
     min_date = date(2025, 5, 10)    
-    max_date = date(2025, 5, 15) 
+    max_date = date(2025, 5, 15)
 
     store_data_historically(
         project_id=project_id,
@@ -27,7 +30,7 @@ def main():
         year=year,
         min_date=min_date,
         max_date = max_date,
-        restaurant_flag='IN',
+        vertical= vendor_v,
         save_local=True
     )
 
