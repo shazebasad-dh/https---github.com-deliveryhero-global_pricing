@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 from joblib import Parallel, delayed
+from multiprocessing import Pool, cpu_count
+from functools import partial
+from tqdm.auto import tqdm
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------------
 # Performing Bootstrapping
@@ -153,7 +159,7 @@ def bootstrap_diff_means_parallel(
     n_resamples: int = 1000,
     alpha: float = 0.05,
     seed: int = 42,
-    store_boot_diffs: bool = False,
+    store_boot_diffs: bool = True,
     n_jobs: int = -1,
 ):  
 
@@ -258,6 +264,7 @@ def apply_bootstrap_diff_means(
     """
 
     results = []
+    bootstraps = {}
 
     all_groups = df[group_col].dropna().unique()
     all_weeks = sorted(df["as_of_date"].dropna().unique())
@@ -265,8 +272,12 @@ def apply_bootstrap_diff_means(
     for group_val in tqdm(all_groups, desc=f"{group_col} groups"):
         df_group = df[df[group_col] == group_val]
 
+        logger.info(f"\nBrand/Entity: {group_val}")
+
         for week in tqdm(all_weeks, desc="Weeks", leave=False):
             df_cumulative = df_group[df_group["as_of_date"] == week]
+
+            logger.info(f"Week: {week.date()}")
 
             if df_cumulative["is_customer_holdout"].nunique() < 2:
                 continue
@@ -276,10 +287,14 @@ def apply_bootstrap_diff_means(
                 "as_of_date": week
             }
 
+            bootstraps[(group_val, week)] = {}
+
             for metric in adjusted_metrics:
                 if metric not in df_cumulative.columns:
                     continue
-
+                
+                logger.info(f"Metric: {metric}")
+                
                 try:
                     result = bootstrap_diff_means_parallel(
                         df=df_cumulative,
@@ -309,17 +324,14 @@ def apply_bootstrap_diff_means(
                     row[f"{metric}_n_users_non_holdout"] = result["n_users_non_holdout"]
                     row[f"{metric}_n_users_holdout"] = result["n_users_holdout"]
                     
-                    #Optionally: remove or comment out if too large
-                    # row[f"{metric}_boot_diffs"] = result["boot_diffs"]
+                    if "boot_diffs" in result:
+                        bootstraps[(group_val, week)][metric] = result
 
                 except Exception as e:
                     logger.info(f"Error with {group_col}={group_val}, week={week}, metric={metric}: {e}")
                     continue
 
-            logger.info(f"\nBrand/Entity: {group_val}")
-            logger.info(f"Week: {week.date()}")
-            
             results.append(row)
-            gc.collect()
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(results), bootstraps
+
