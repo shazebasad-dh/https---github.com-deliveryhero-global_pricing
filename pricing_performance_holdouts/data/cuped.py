@@ -89,7 +89,9 @@ def apply_cuped_adjustment(df: pd.DataFrame,
                     except Exception as e:
                         logger.warning(f"⚠️ Error in CUPED for Entity {entity_id}, Week {as_of_date}: {e}")
                         continue
-
+        
                 final_df = pd.concat([final_df, tmp_group], ignore_index=True)
+    
+    logger.info(f"🎯 CUPED complete: Final DataFrame has {len(final_df)} rows.")
 
     return final_df
