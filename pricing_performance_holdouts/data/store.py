@@ -55,6 +55,7 @@ def upload_parquet_to_gcs(df: pd.DataFrame,
 
 def store_data_cloud(df: pd.DataFrame,
                      week_dates: List[pd.Timestamp],
+                     vendor_vertical: tuple[str, ...],
                      gcs_bucket: str = "holdout_data",
                      project: str = "logistics-data-storage-staging",
                      save_local: bool = False,
@@ -86,21 +87,28 @@ def store_data_cloud(df: pd.DataFrame,
     storage_client = storage.Client(project=PROJECT_ID)
     bucket = storage_client.bucket(GCS_BUCKET_NAME)
    
-    for week in tqdm(week_dates, desc= 'Week', position=0):
+    vertical_lower = [v.lower() for v in vendor_vertical]
+    if any(v in vertical_lower for v in ['restaurant', 'restaurants']):
+        folder_name = 'restaurants'
+    else:
+        folder_name = 'quick_commerce'
     
-        GCS_PARQUET_PATH = f"parquet_files/cuped_holdout_as_of_{week}.parquet" 
+    for week in tqdm(week_dates, desc= 'Week', position=0):
         
         df_week = df[df['as_of_date'].dt.date == week]
         logger.info(f"Saving week {week} → {len(df_week)} rows")
 
-        if save_local:
-            output_dir = Path(__file__).resolve().parent.parent / "outputs" / "raw_data"
-            output_dir.mkdir(parents=True, exist_ok=True)
+        file_name = f"cuped_holdout_as_of_{week}.parquet"
 
-            local_file = output_dir / f"cuped_holdout_as_of_{week}.parquet"
+        if save_local:
+            output_dir = Path(__file__).resolve().parent.parent / "outputs" / "raw_data" / folder_name
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            local_file = output_dir / file_name
             df_week.to_parquet(local_file, engine="fastparquet", index=False)
 
         if save_cloud_storage:
-            upload_parquet_to_gcs(df_week, bucket, GCS_PARQUET_PATH, overwrite=True)
+            gcs_path = f"parquet_files/{folder_name}/{file_name}"
+            upload_parquet_to_gcs(df_week, bucket, gcs_path, overwrite=overwrite)
 
 
