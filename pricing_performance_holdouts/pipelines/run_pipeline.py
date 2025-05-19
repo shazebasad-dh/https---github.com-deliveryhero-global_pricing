@@ -18,13 +18,13 @@ def run_historical_data_store():
     'PY_HN', 'FP_MY' ,'FP_TH', 'FY_CY', 'PY_VE','PO_FI','TB_QA','TB_OM',
     'TB_KW','TB_JO','TB_IQ','TB_BH','TB_AE','HS_SA','FP_HK','FP_KH','HF_EG')))
 
-    #vendor_v = ('Restaurant','restaurant','restaurants')
-    vendor_v = ('supermarket', 'specialty','shops','shop','darkstores','Shop','Dmart')
+    vendor_v = ('Restaurant','restaurant','restaurants')
+    #vendor_v = ('supermarket', 'specialty','shops','shop','darkstores','Shop','Dmart')
 
     year = 2025
 
-    min_date = date(2025, 5, 10)    
-    max_date = date(2025, 5, 15)
+    min_date = date(2025, 5, 19)    
+    max_date = date(2025, 5, 20)
 
     store_data_historical(
         project_id=project_id,
@@ -39,20 +39,20 @@ def run_historical_data_store():
 
 def run_profitable_growth_store():
 
-    w_no = ['2025-05-12']
+    w_no = ['2025-05-19']
     vertical = 'restaurants'
 
-    return store_data_profitable_growth(weeks = w_no,vertical_type = vertical , group = 'entity_id')
+    return store_data_profitable_growth(weeks = w_no,vertical_type = vertical , group = 'brand_name')
 
 def main():
     
-    #logging.info("Starting historical data storage step...")
-    #run_historical_data_store()
+    # logging.info("Starting historical data storage step...")
+    # run_historical_data_store()
 
     logging.info("Running profitable growth analysis...")
     results = run_profitable_growth_store()
 
-    # Now you can view the output
+    #Now you can view the output
     for week, df in results:
         print(f"\nResults for week {week}:")
         print(df.head())
