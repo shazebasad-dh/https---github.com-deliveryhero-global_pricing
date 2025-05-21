@@ -18,8 +18,8 @@ def run_historical_data_store():
     'PY_HN', 'FP_MY' ,'FP_TH', 'FY_CY', 'PY_VE','PO_FI','TB_QA','TB_OM',
     'TB_KW','TB_JO','TB_IQ','TB_BH','TB_AE','HS_SA','FP_HK','FP_KH','HF_EG')))
 
-    vendor_v = ('Restaurant','restaurant','restaurants')
-    #vendor_v = ('supermarket', 'specialty','shops','shop','darkstores','Shop','Dmart')
+    #vendor_v = ('Restaurant','restaurant','restaurants')
+    vendor_v = ('supermarket', 'specialty','shops','shop','darkstores','Shop','Dmart')
 
     year = 2025
 
@@ -40,9 +40,9 @@ def run_historical_data_store():
 def run_profitable_growth_store():
 
     w_no = ['2025-05-19']
-    vertical = 'restaurants'
+    vertical = 'quick_commerce'
 
-    return store_data_profitable_growth(weeks = w_no,vertical_type = vertical , group = 'brand_name')
+    return store_data_profitable_growth(weeks = w_no,vertical_type = vertical , group = 'entity_id')
 
 def main():
     
