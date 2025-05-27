@@ -51,12 +51,16 @@ def compute_profitable_growth(
         delta_profit = boot_profit[i]
         delta_order = boot_order[i]
 
-        # Adjust profit_per_order if both values are negative
-        adjusted_profit_per_order_bootstrap = (
-            abs(profit_per_order)
-            if (delta_profit * n_users_non_holdout < 0 and profit_per_order < 0)
-            else profit_per_order
-        )
+        # # Adjust profit_per_order if both values are negative
+        # adjusted_profit_per_order_bootstrap = (
+        #     abs(profit_per_order)
+        #     if (delta_profit * n_users_non_holdout < 0 and profit_per_order < 0)
+        #     else profit_per_order
+        # )
+        if delta_profit > 0 and profit_per_order < 0:
+            adjusted_profit_per_order_bootstrap = abs(profit_per_order)
+        else:
+            adjusted_profit_per_order_bootstrap = profit_per_order
 
         growth = (
             ((delta_profit * n_users_non_holdout) / adjusted_profit_per_order_bootstrap) +
@@ -73,15 +77,19 @@ def compute_profitable_growth(
     observed_delta_profit = profit_result["observed_diff"]
     observed_delta_order = order_result["observed_diff"]
 
-    # Adjust profit_per_order if both values are negative
-    adjusted_profit_per_order_observed = (
-        abs(profit_per_order)
-        if (observed_delta_profit * n_users_non_holdout < 0 and profit_per_order < 0)
-        else profit_per_order
-    )
+    # # Adjust profit_per_order if both values are negative
+    # adjusted_profit_per_order_observed = (
+    #     abs(profit_per_order)
+    #     if (observed_delta_profit * n_users_non_holdout < 0 and profit_per_order < 0)
+    #     else profit_per_order
+    # )
+    if profit_result['mean_non_holdout'] < 0 and observed_delta_profit > 0:
+        adjusted_profit_per_order = abs(profit_per_order)
+    else:
+        adjusted_profit_per_order = profit_per_order
 
     observed_growth = (
-        ((observed_delta_profit * n_users_non_holdout) / adjusted_profit_per_order_observed) +
+        ((observed_delta_profit * n_users_non_holdout) / adjusted_profit_per_order) +
         (observed_delta_order * n_users_non_holdout)
     ) / baseline_orders
 
